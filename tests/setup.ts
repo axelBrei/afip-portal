@@ -1,0 +1,13 @@
+import { vi } from 'vitest'
+
+process.env.SESSION_SECRET = 'test-secret-that-is-at-least-32-characters-long!!'
+process.env.PORTAL_USER = 'admin'
+process.env.PORTAL_PASSWORD = 'password'
+process.env.ARCA_CUIT = '20111111112'
+process.env.ARCA_ENV = 'homologation'
+process.env.DATABASE_URL = 'postgres://test:test@localhost:5432/test'
+process.env.R2_ACCOUNT_ID = 'test-account'
+process.env.R2_ACCESS_KEY_ID = 'test-key'
+process.env.R2_SECRET_ACCESS_KEY = 'test-secret'
+process.env.R2_BUCKET = 'test-bucket'
+process.env.ALLOWED_ORIGINS = 'http://localhost:3001'
