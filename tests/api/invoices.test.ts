@@ -129,6 +129,7 @@ describe('POST /api/v1/invoices', () => {
     expect(res.status).toBe(201)
     expect(mockCreateNextVoucher).toHaveBeenCalledOnce()
     expect(mockUploadPdf).toHaveBeenCalledOnce()
+    expect(mockUploadPdf).toHaveBeenCalledWith(expect.stringMatching(/^invoices\/\d+\/\d{4}\/[a-f0-9-]+\.pdf$/), expect.any(Buffer))
   })
 
   it('returns 422 when ARCA rejects', async () => {
@@ -198,13 +199,15 @@ describe('GET /api/v1/invoices/:id/pdf', () => {
     mockSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{ pdfUrl: 'invoices/key.pdf' }]),
+          limit: vi.fn().mockResolvedValue([{ pdfUrl: 'invoices/20111111112/2026/uuid-1.pdf' }]),
         }),
       }),
     })
     const req = new NextRequest('http://localhost/api/v1/invoices/uuid-1/pdf')
     const res = await getPdf(req, { params: { id: 'uuid-1' } })
     expect(res.status).toBe(302)
+    expect(mockGetPresignedUrl).toHaveBeenCalledWith('invoices/20111111112/2026/uuid-1.pdf', 900)
+    expect(res.headers.get('Location')).toBe('https://r2.example.com/test.pdf')
   })
 
   it('returns 404 when pdf not found', async () => {
