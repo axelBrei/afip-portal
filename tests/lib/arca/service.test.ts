@@ -58,4 +58,30 @@ describe('ArcaService', () => {
     const { arcaService } = await import('@/lib/arca/service')
     expect(arcaService.getCertStatus()).toEqual({ loaded: false, source: null })
   })
+
+  it('reload() clears client so next getClient() creates a new instance', async () => {
+    vi.mocked(existsSync).mockImplementation((p) =>
+      p === '/fake/cert.crt' || p === '/fake/cert.key'
+    )
+    const { arcaService } = await import('@/lib/arca/service')
+    const first = arcaService.getClient()
+    vi.mocked(Arca).mockClear()
+    arcaService.reload()
+    // After reload, Arca should be constructed again
+    expect(Arca).toHaveBeenCalledTimes(1)
+  })
+
+  it('getCertStatus returns loaded:true source:volume when volume cert exists', async () => {
+    vi.mocked(existsSync).mockImplementation((p) => p === '/data/certs/cert.crt')
+    const { arcaService } = await import('@/lib/arca/service')
+    expect(arcaService.getCertStatus()).toEqual({ loaded: true, source: 'volume' })
+  })
+
+  it('getCertStatus returns loaded:true source:env when env cert exists', async () => {
+    vi.mocked(existsSync).mockImplementation((p) =>
+      p === '/fake/cert.crt' // matches ARCA_CERT_PATH
+    )
+    const { arcaService } = await import('@/lib/arca/service')
+    expect(arcaService.getCertStatus()).toEqual({ loaded: true, source: 'env' })
+  })
 })
