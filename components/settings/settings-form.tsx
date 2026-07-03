@@ -18,7 +18,7 @@ interface SettingsData {
 
 async function fetchSettings(): Promise<SettingsData> {
   const res = await fetch('/api/v1/settings')
-  if (!res.ok) throw new Error('Failed to fetch settings')
+  if (!res.ok) throw new Error(`Failed to fetch settings: ${res.status} ${res.statusText}`)
   return res.json()
 }
 
@@ -48,8 +48,14 @@ export function SettingsForm() {
         setUploadResult({ ok: true, message: 'Certificados actualizados correctamente' })
         queryClient.invalidateQueries({ queryKey: ['settings'] })
       } else {
-        const err = await res.json()
-        setUploadResult({ ok: false, message: err.error ?? 'Error al subir los certificados' })
+        let message = 'Error al subir los certificados'
+        try {
+          const body = await res.json()
+          if (body?.error) message = body.error
+        } catch {
+          // non-JSON error response
+        }
+        setUploadResult({ ok: false, message })
       }
     } finally {
       setUploading(false)
