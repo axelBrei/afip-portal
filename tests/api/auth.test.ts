@@ -21,6 +21,7 @@ describe('POST /api/v1/auth/login', () => {
   beforeEach(() => {
     vi.mocked(getIronSession).mockResolvedValue(mockSession as never)
     mockSave.mockReset()
+    mockDestroy.mockReset()
     mockSession.user = undefined
   })
 

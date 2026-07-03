@@ -5,7 +5,7 @@ export interface SessionData {
 }
 
 export const sessionOptions: SessionOptions = {
-  password: process.env.SESSION_SECRET!,
+  password: process.env.SESSION_SECRET ?? (() => { throw new Error('SESSION_SECRET is not set') })(),
   cookieName: 'afip-session',
   cookieOptions: {
     secure: process.env.NODE_ENV === 'production',

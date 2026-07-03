@@ -33,7 +33,13 @@ export async function middleware(request: NextRequest) {
 
   if (pathname.startsWith('/api/')) {
     if (!isAllowedOrigin(origin, request.url)) {
-      return new NextResponse('Forbidden', { status: 403 })
+      return new NextResponse('Forbidden', {
+        status: 403,
+        headers: {
+          'Access-Control-Allow-Origin': origin ?? '*',
+          'Access-Control-Allow-Credentials': 'true',
+        },
+      })
     }
 
     if (request.method === 'OPTIONS') {
@@ -63,7 +69,13 @@ export async function middleware(request: NextRequest) {
   const session = await getSession(request)
   if (!session?.user) {
     if (pathname.startsWith('/api/')) {
-      return new NextResponse('Unauthorized', { status: 401 })
+      return new NextResponse('Unauthorized', {
+        status: 401,
+        headers: {
+          'Access-Control-Allow-Origin': origin ?? '*',
+          'Access-Control-Allow-Credentials': 'true',
+        },
+      })
     }
     return NextResponse.redirect(new URL('/login', request.url))
   }
