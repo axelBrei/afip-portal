@@ -1,0 +1,19 @@
+services:
+  afip-portal:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - certs:/data/certs
+    env_file:
+      - .env
+    networks:
+      - shared-net
+
+volumes:
+  certs:
+
+networks:
+  shared-net:
+    external: true
