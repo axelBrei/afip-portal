@@ -46,9 +46,7 @@ export async function GET(
 
     const arca = arcaService.getClient()
     const service = getService(arca, scope)
-    // The SDK type declares number but the service accepts string CUITs at runtime
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const taxpayer = await (service.getTaxpayerDetails as unknown as (id: string) => ReturnType<typeof service.getTaxpayerDetails>)(cuit)
+    const taxpayer = await service.getTaxpayerDetails(parseInt(cuit, 10))
 
     if (!taxpayer) {
       return NextResponse.json({ error: 'Taxpayer not found' }, { status: 404 })

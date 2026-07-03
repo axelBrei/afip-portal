@@ -79,7 +79,7 @@ describe('GET /api/v1/padron/:cuit', () => {
     const body = await res.json()
     expect(res.status).toBe(200)
     expect(body.cached).toBe(false)
-    expect(mockGetTaxpayerDetails).toHaveBeenCalledWith('20111111112')
+    expect(mockGetTaxpayerDetails).toHaveBeenCalledWith(20111111112)
   })
 
   it('returns 404 when ARCA returns null', async () => {
