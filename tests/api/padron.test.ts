@@ -79,7 +79,7 @@ describe('GET /api/v1/padron/:cuit', () => {
     const body = await res.json()
     expect(res.status).toBe(200)
     expect(body.cached).toBe(false)
-    expect(mockGetTaxpayerDetails).toHaveBeenCalledWith(20111111112)
+    expect(mockGetTaxpayerDetails).toHaveBeenCalledWith('20111111112')
   })
 
   it('returns 404 when ARCA returns null', async () => {
@@ -87,5 +87,14 @@ describe('GET /api/v1/padron/:cuit', () => {
     const req = new NextRequest('http://localhost/api/v1/padron/20111111112')
     const res = await GET(req, { params: { cuit: '20111111112' } })
     expect(res.status).toBe(404)
+  })
+
+  it('returns 500 with error message when getTaxpayerDetails throws', async () => {
+    mockGetTaxpayerDetails.mockRejectedValue(new Error('ARCA service unavailable'))
+    const req = new NextRequest('http://localhost/api/v1/padron/20111111112')
+    const res = await GET(req, { params: { cuit: '20111111112' } })
+    const body = await res.json()
+    expect(res.status).toBe(500)
+    expect(body).toEqual({ error: 'Internal server error' })
   })
 })

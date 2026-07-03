@@ -33,34 +33,40 @@ export async function GET(
     return NextResponse.json({ error: `scope must be one of ${VALID_SCOPES.join(', ')}` }, { status: 400 })
   }
 
-  const cached = await db
-    .select()
-    .from(padronCache)
-    .where(eq(padronCache.cuit, cuit))
-    .limit(1)
+  try {
+    const cached = await db
+      .select()
+      .from(padronCache)
+      .where(eq(padronCache.cuit, cuit))
+      .limit(1)
 
-  if (cached[0] && new Date(cached[0].expiresAt) > new Date()) {
-    return NextResponse.json({ data: cached[0].data, cached: true })
+    if (cached[0] && new Date(cached[0].expiresAt) > new Date()) {
+      return NextResponse.json({ data: cached[0].data, cached: true })
+    }
+
+    const arca = arcaService.getClient()
+    const service = getService(arca, scope)
+    // The SDK type declares number but the service accepts string CUITs at runtime
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const taxpayer = await (service.getTaxpayerDetails as unknown as (id: string) => ReturnType<typeof service.getTaxpayerDetails>)(cuit)
+
+    if (!taxpayer) {
+      return NextResponse.json({ error: 'Taxpayer not found' }, { status: 404 })
+    }
+
+    const now = new Date()
+    const expiresAt = new Date(now.getTime() + CACHE_TTL_MS)
+
+    await db
+      .insert(padronCache)
+      .values({ cuit, data: taxpayer, fetchedAt: now, expiresAt })
+      .onConflictDoUpdate({
+        target: padronCache.cuit,
+        set: { data: taxpayer, fetchedAt: now, expiresAt },
+      })
+
+    return NextResponse.json({ data: taxpayer, cached: false })
+  } catch {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-
-  const arca = arcaService.getClient()
-  const service = getService(arca, scope)
-  const taxpayer = await service.getTaxpayerDetails(parseInt(cuit, 10))
-
-  if (!taxpayer) {
-    return NextResponse.json({ error: 'Taxpayer not found' }, { status: 404 })
-  }
-
-  const now = new Date()
-  const expiresAt = new Date(now.getTime() + CACHE_TTL_MS)
-
-  await db
-    .insert(padronCache)
-    .values({ cuit, data: taxpayer, fetchedAt: now, expiresAt })
-    .onConflictDoUpdate({
-      target: padronCache.cuit,
-      set: { data: taxpayer, fetchedAt: now, expiresAt },
-    })
-
-  return NextResponse.json({ data: taxpayer, cached: false })
 }
