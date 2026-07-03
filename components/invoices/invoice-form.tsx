@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
+import Link from 'next/link'
+import { useMutation } from '@tanstack/react-query'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
@@ -14,6 +15,7 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Trash2, Plus } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 const IVA_RATES = [
   { id: 3, label: '0%', rate: 0 },
@@ -46,6 +48,23 @@ type FormData = z.infer<typeof formSchema>
 
 type Step = 'receptor' | 'items' | 'preview' | 'done'
 
+type InvoicePayload = {
+  puntoVenta: number
+  tipoCbte: number
+  concepto: number
+  docTipo: number
+  docNro: number
+  receptorCuit?: string
+  receptorName?: string
+  impNeto: number
+  impIva: number
+  impTotal: number
+  monId: string
+  monCotiz: number
+  iva: { Id: number; BaseImp: number; Importe: number }[]
+  items: { description: string; quantity: number; unitPrice: number; ivaRate: number }[]
+}
+
 function calcTotals(items: FormData['items']) {
   let net = 0
   let iva = 0
@@ -73,13 +92,13 @@ function calcTotals(items: FormData['items']) {
 }
 
 export function InvoiceForm() {
-  const router = useRouter()
   const [step, setStep] = useState<Step>('receptor')
   const [receptorName, setReceptorName] = useState<string | null>(null)
   const [lookingUp, setLookingUp] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [createdInvoice, setCreatedInvoice] = useState<any>(null)
 
-  const { register, control, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const { register, control, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       tipoCbte: 6,
@@ -91,6 +110,15 @@ export function InvoiceForm() {
   const { fields, append, remove } = useFieldArray({ control, name: 'items' })
   const watchedItems = watch('items')
   const watchedCuit = watch('receptorCuit')
+  const watchedTipoCbte = watch('tipoCbte')
+
+  // Fix 2: Auto-trigger padron lookup when CUIT reaches 11 digits
+  useEffect(() => {
+    if (/^\d{11}$/.test(watchedCuit ?? '')) {
+      lookupCuit()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedCuit])
 
   async function lookupCuit() {
     const cuit = (watchedCuit ?? '').replace(/\D/g, '')
@@ -108,10 +136,30 @@ export function InvoiceForm() {
     }
   }
 
-  async function onSubmit(data: FormData) {
+  // Fix 1: Replace raw fetch with useMutation
+  const createInvoice = useMutation({
+    mutationFn: async (payload: InvoicePayload) => {
+      const res = await fetch('/api/v1/invoices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error(await res.text())
+      return res.json()
+    },
+    onSuccess: (invoice) => {
+      setStep('done')
+      setCreatedInvoice(invoice)
+    },
+    onError: (err) => {
+      setSubmitError(err instanceof Error ? err.message : 'Error al crear factura')
+    },
+  })
+
+  function onSubmit(data: FormData) {
     setSubmitError(null)
     const totals = calcTotals(data.items)
-    const payload = {
+    const payload: InvoicePayload = {
       puntoVenta: data.puntoVenta,
       tipoCbte: data.tipoCbte,
       concepto: 2,
@@ -132,21 +180,29 @@ export function InvoiceForm() {
         ivaRate: IVA_RATES.find((r) => r.id === i.ivaRateId)?.rate ?? 21,
       })),
     }
-    const res = await fetch('/api/v1/invoices', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    if (res.ok) {
-      const invoice = await res.json()
-      router.push(`/invoices/${invoice.id}`)
-    } else {
-      const err = await res.json()
-      setSubmitError(err.error ?? 'Error al crear la factura')
-    }
+    createInvoice.mutate(payload)
   }
 
   const totals = calcTotals(watchedItems ?? [])
+
+  // Fix 3: Done step
+  if (step === 'done' && createdInvoice) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Factura autorizada</h2>
+        <p>CAE: <strong>{createdInvoice.cae}</strong></p>
+        <p>Vence: {createdInvoice.caeFchVto}</p>
+        <div className="flex gap-2">
+          <a href={`/api/v1/invoices/${createdInvoice.id}/pdf`} target="_blank" rel="noopener noreferrer">
+            Descargar PDF
+          </a>
+          <Link href="/invoices" className={cn(buttonVariants({ variant: 'outline' }))}>
+            Volver a facturas
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
@@ -157,8 +213,9 @@ export function InvoiceForm() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label>Tipo de comprobante</Label>
+                {/* Fix 4: controlled value prop */}
                 <Select
-                  defaultValue="6"
+                  value={watchedTipoCbte?.toString() ?? '6'}
                   onValueChange={(v) => { if (v != null) setValue('tipoCbte', parseInt(v, 10)) }}
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -202,43 +259,47 @@ export function InvoiceForm() {
         <Card>
           <CardHeader><CardTitle>Paso 2: Ítems</CardTitle></CardHeader>
           <CardContent className="space-y-3">
-            {fields.map((field, idx) => (
-              <div key={field.id} className="grid grid-cols-12 gap-2 items-end">
-                <div className="col-span-4 space-y-1">
-                  {idx === 0 && <Label>Descripción</Label>}
-                  <Input {...register(`items.${idx}.description`)} placeholder="Descripción" />
+            {fields.map((field, idx) => {
+              const ivaRateId = watch(`items.${idx}.ivaRateId`)
+              return (
+                <div key={field.id} className="grid grid-cols-12 gap-2 items-end">
+                  <div className="col-span-4 space-y-1">
+                    {idx === 0 && <Label>Descripción</Label>}
+                    <Input {...register(`items.${idx}.description`)} placeholder="Descripción" />
+                  </div>
+                  <div className="col-span-2 space-y-1">
+                    {idx === 0 && <Label>Cantidad</Label>}
+                    <Input type="number" step="0.01" {...register(`items.${idx}.quantity`)} />
+                  </div>
+                  <div className="col-span-2 space-y-1">
+                    {idx === 0 && <Label>Precio unit.</Label>}
+                    <Input type="number" step="0.01" {...register(`items.${idx}.unitPrice`)} />
+                  </div>
+                  <div className="col-span-3 space-y-1">
+                    {idx === 0 && <Label>IVA</Label>}
+                    {/* Fix 4: controlled value prop */}
+                    <Select
+                      value={ivaRateId?.toString() ?? '5'}
+                      onValueChange={(v) => { if (v != null) setValue(`items.${idx}.ivaRateId`, parseInt(v, 10)) }}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {IVA_RATES.map((r) => (
+                          <SelectItem key={r.id} value={r.id.toString()}>{r.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-1">
+                    {fields.length > 1 && (
+                      <Button type="button" variant="ghost" size="icon" onClick={() => remove(idx)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                <div className="col-span-2 space-y-1">
-                  {idx === 0 && <Label>Cantidad</Label>}
-                  <Input type="number" step="0.01" {...register(`items.${idx}.quantity`)} />
-                </div>
-                <div className="col-span-2 space-y-1">
-                  {idx === 0 && <Label>Precio unit.</Label>}
-                  <Input type="number" step="0.01" {...register(`items.${idx}.unitPrice`)} />
-                </div>
-                <div className="col-span-3 space-y-1">
-                  {idx === 0 && <Label>IVA</Label>}
-                  <Select
-                    defaultValue="5"
-                    onValueChange={(v) => { if (v != null) setValue(`items.${idx}.ivaRateId`, parseInt(v, 10)) }}
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {IVA_RATES.map((r) => (
-                        <SelectItem key={r.id} value={r.id.toString()}>{r.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="col-span-1">
-                  {fields.length > 1 && (
-                    <Button type="button" variant="ghost" size="icon" onClick={() => remove(idx)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))}
+              )
+            })}
             {errors.items && <p className="text-sm text-destructive">{errors.items.message}</p>}
             <Button
               type="button"
@@ -284,8 +345,8 @@ export function InvoiceForm() {
           </CardContent>
           <CardFooter className="gap-2">
             <Button type="button" variant="outline" onClick={() => setStep('items')}>Atrás</Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Autorizando...' : 'Autorizar factura'}
+            <Button type="submit" disabled={createInvoice.isPending}>
+              {createInvoice.isPending ? 'Autorizando...' : 'Autorizar factura'}
             </Button>
           </CardFooter>
         </Card>
