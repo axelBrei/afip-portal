@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { Suspense } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { InvoiceDetail } from '@/components/invoices/invoice-detail'

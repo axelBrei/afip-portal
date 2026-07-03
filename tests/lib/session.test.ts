@@ -1,16 +1,16 @@
 import { describe, it, expect } from 'vitest'
-import { sessionOptions } from '@/lib/session'
+import { getSessionOptions } from '@/lib/session'
 
-describe('sessionOptions', () => {
+describe('getSessionOptions', () => {
   it('uses the SESSION_SECRET env var', () => {
-    expect(sessionOptions.password).toBe(process.env.SESSION_SECRET)
+    expect(getSessionOptions().password).toBe(process.env.SESSION_SECRET)
   })
 
   it('sets httpOnly cookie', () => {
-    expect(sessionOptions.cookieOptions?.httpOnly).toBe(true)
+    expect(getSessionOptions().cookieOptions?.httpOnly).toBe(true)
   })
 
   it('uses afip-session cookie name', () => {
-    expect(sessionOptions.cookieName).toBe('afip-session')
+    expect(getSessionOptions().cookieName).toBe('afip-session')
   })
 })

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { writeFileSync, mkdirSync } from 'fs'
+import { writeFile, mkdir } from 'fs/promises'
 import { arcaService } from '@/lib/arca/service'
 
 const CERTS_DIR = '/data/certs'
@@ -26,11 +26,18 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid private key file' }, { status: 400 })
   }
 
-  mkdirSync(CERTS_DIR, { recursive: true })
-  writeFileSync(`${CERTS_DIR}/cert.crt`, certContent, 'utf-8')
-  writeFileSync(`${CERTS_DIR}/cert.key`, keyContent, 'utf-8')
+  await mkdir(CERTS_DIR, { recursive: true })
+  await writeFile(`${CERTS_DIR}/cert.crt`, Buffer.from(await certFile.arrayBuffer()))
+  await writeFile(`${CERTS_DIR}/cert.key`, Buffer.from(await keyFile.arrayBuffer()))
 
-  arcaService.reload()
+  try {
+    await arcaService.reload()
+  } catch (err) {
+    return NextResponse.json(
+      { error: 'Certificates saved but failed to initialize: ' + (err instanceof Error ? err.message : 'Unknown error') },
+      { status: 422 }
+    )
+  }
 
   return NextResponse.json({ ok: true })
 }

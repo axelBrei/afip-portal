@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getIronSession } from 'iron-session'
 import { cookies } from 'next/headers'
-import { sessionOptions, type SessionData } from '@/lib/session'
+import { getSessionOptions, type SessionData } from '@/lib/session'
 import { z } from 'zod'
 
 const schema = z.object({
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
   }
 
-  const session = await getIronSession<SessionData>(await cookies(), sessionOptions)
+  const session = await getIronSession<SessionData>(await cookies(), getSessionOptions())
   session.user = { username }
   await session.save()
 

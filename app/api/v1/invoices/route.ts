@@ -66,6 +66,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const arcaCuit = process.env.ARCA_CUIT
+  if (!arcaCuit) {
+    return NextResponse.json({ error: 'ARCA_CUIT not configured' }, { status: 503 })
+  }
+
   const body = await request.json().catch(() => null)
   const parsed = createSchema.safeParse(body)
   if (!parsed.success) {
@@ -120,7 +125,7 @@ export async function POST(request: NextRequest) {
   const pdfGen = new InvoicePdfGenerator({ includeQr: true })
   const pdfBuffer = await pdfGen.generate({
     emisor: {
-      cuit: process.env.ARCA_CUIT!,
+      cuit: arcaCuit,
       razonSocial: process.env.ARCA_RAZON_SOCIAL ?? '',
       domicilioComercial: process.env.ARCA_DOMICILIO ?? '',
       condicionIva: process.env.ARCA_CONDICION_IVA ?? 'Responsable Inscripto',
@@ -157,14 +162,14 @@ export async function POST(request: NextRequest) {
 
   const id = randomUUID()
   const year = new Date().getFullYear()
-  const pdfKey = `invoices/${process.env.ARCA_CUIT}/${year}/${id}.pdf`
+  const pdfKey = `invoices/${arcaCuit}/${year}/${id}.pdf`
   await uploadPdf(pdfKey, pdfBuffer)
 
   const [invoice] = await db
     .insert(invoices)
     .values({
       id,
-      cuit: process.env.ARCA_CUIT!,
+      cuit: arcaCuit,
       tipoCbte: data.tipoCbte,
       puntoVenta: data.puntoVenta,
       nroCbte,
