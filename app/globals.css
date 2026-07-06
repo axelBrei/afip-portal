@@ -6,89 +6,69 @@
 
 @layer base {
   :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --destructive-foreground: 210 40% 98%;
-    --ring: oklch(0.708 0 0);
-    --radius: 0.625rem;
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    /* Canvas — #010102 near-black with faint blue tint */
+    --background: 240 33.3% 0.6%;
+    --foreground: 180 6.7% 97.1%;
+
+    /* Surface-1 — #111116 */
+    --card: 240 12.8% 7.6%;
+    --card-foreground: 180 6.7% 97.1%;
+    --popover: 240 12.8% 7.6%;
+    --popover-foreground: 180 6.7% 97.1%;
+
+    /* Primary — lavender-blue #5e6ad2 */
+    --primary: 234 56.3% 59.6%;
+    --primary-foreground: 180 6.7% 97.1%;
+
+    /* Surface-2 — #1a1a22 */
+    --secondary: 240 13.3% 11.8%;
+    --secondary-foreground: 180 6.7% 97.1%;
+
+    /* Muted — surface-2 bg / ink-subtle text */
+    --muted: 240 13.3% 11.8%;
+    --muted-foreground: 219 6.4% 56.9%;
+
+    /* Accent — surface-3 #222229 */
+    --accent: 240 9.3% 14.7%;
+    --accent-foreground: 180 6.7% 97.1%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 180 6.7% 97.1%;
+
+    /* Hairline — #23252a */
+    --border: 223 9.1% 15.1%;
+    --input: 223 9.1% 15.1%;
+
+    /* Focus ring — #5e69d1 */
+    --ring: 234 55.6% 59.4%;
+
+    /* 8px = rounded.md for buttons/inputs */
+    --radius: 0.5rem;
+
+    --sidebar: 240 12.8% 7.6%;
+    --sidebar-foreground: 180 6.7% 97.1%;
+    --sidebar-primary: 234 56.3% 59.6%;
+    --sidebar-primary-foreground: 180 6.7% 97.1%;
+    --sidebar-accent: 240 13.3% 11.8%;
+    --sidebar-accent-foreground: 180 6.7% 97.1%;
+    --sidebar-border: 223 9.1% 15.1%;
+    --sidebar-ring: 234 55.6% 59.4%;
   }
+
   .theme {
     --font-heading: var(--font-sans);
     --font-sans: var(--font-sans);
   }
-  .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
-  }
+
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+
   html {
     @apply font-sans;
   }
-}
-
-@layer base {
-  * { @apply border-border; }
-  body { @apply bg-background text-foreground; }
 }

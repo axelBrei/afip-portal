@@ -26,13 +26,21 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid private key file' }, { status: 400 })
   }
 
-  await mkdir(CERTS_DIR, { recursive: true })
-  await writeFile(`${CERTS_DIR}/cert.crt`, Buffer.from(await certFile.arrayBuffer()))
-  await writeFile(`${CERTS_DIR}/cert.key`, Buffer.from(await keyFile.arrayBuffer()))
+  try {
+    await mkdir(CERTS_DIR, { recursive: true })
+    await writeFile(`${CERTS_DIR}/cert.crt`, Buffer.from(await certFile.arrayBuffer()))
+    await writeFile(`${CERTS_DIR}/cert.key`, Buffer.from(await keyFile.arrayBuffer()))
+    console.log('[PUT /api/v1/settings/certificates] Files written to disk')
+  } catch (err) {
+    console.error('[PUT /api/v1/settings/certificates] File write error:', err)
+    return NextResponse.json({ error: 'Failed to save certificate files', details: String(err) }, { status: 500 })
+  }
 
   try {
     await arcaService.reload()
+    console.log('[PUT /api/v1/settings/certificates] arcaService reloaded successfully')
   } catch (err) {
+    console.error('[PUT /api/v1/settings/certificates] arcaService reload error:', err)
     return NextResponse.json(
       { error: 'Certificates saved but failed to initialize: ' + (err instanceof Error ? err.message : 'Unknown error') },
       { status: 422 }

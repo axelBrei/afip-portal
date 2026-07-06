@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { unsealData } from 'iron-session'
 import type { SessionData } from '@/lib/session'
 
-const PUBLIC_PATHS = ['/login', '/api/v1/auth/login', '/api/v1/auth/logout']
+const PUBLIC_PATHS = ['/login', '/api/v1/auth/login', '/api/v1/auth/logout', '/api/v1/health']
 
 function isAllowedOrigin(origin: string | null, requestUrl: string): boolean {
   if (!origin) return true

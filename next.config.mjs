@@ -2,7 +2,7 @@
 const nextConfig = {
   output: 'standalone',
   experimental: {
-    serverComponentsExternalPackages: ['@arcasdk/core', '@arcasdk/pdf'],
+    serverComponentsExternalPackages: ['@arcasdk/core', '@arcasdk/pdf', 'drizzle-orm', 'postgres'],
   },
 }
 

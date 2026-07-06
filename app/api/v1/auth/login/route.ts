@@ -21,12 +21,18 @@ export async function POST(request: NextRequest) {
     username !== process.env.PORTAL_USER ||
     password !== process.env.PORTAL_PASSWORD
   ) {
+    console.warn(`[POST /api/v1/auth/login] Invalid credentials for user="${username}"`)
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
   }
 
-  const session = await getIronSession<SessionData>(await cookies(), getSessionOptions())
-  session.user = { username }
-  await session.save()
-
-  return NextResponse.json({ ok: true })
+  try {
+    const session = await getIronSession<SessionData>(await cookies(), getSessionOptions())
+    session.user = { username }
+    await session.save()
+    console.log(`[POST /api/v1/auth/login] Login successful user="${username}"`)
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    console.error('[POST /api/v1/auth/login] Session error:', err)
+    return NextResponse.json({ error: 'Session error' }, { status: 500 })
+  }
 }

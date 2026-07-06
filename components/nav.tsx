@@ -28,12 +28,12 @@ export function Nav() {
   }
 
   return (
-    <header className="border-b bg-white">
+    <header className="border-b border-border bg-background">
       <div className="container mx-auto flex h-14 items-center gap-4 px-4">
-        <Link href="/invoices" className="font-semibold text-lg mr-4">
+        <Link href="/invoices" className="font-semibold text-sm tracking-tight text-foreground mr-4">
           AFIP Portal
         </Link>
-        <nav className="flex items-center gap-2 flex-1">
+        <nav className="flex items-center gap-1 flex-1">
           <Link
             href="/invoices"
             className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}

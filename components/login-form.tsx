@@ -21,6 +21,7 @@ export function LoginForm() {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
+    defaultValues: { username: '', password: '' },
     resolver: zodResolver(schema),
   })
 
@@ -42,25 +43,25 @@ export function LoginForm() {
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>
-        <CardTitle>AFIP Portal</CardTitle>
+        <CardTitle className="text-base font-semibold tracking-tight">AFIP Portal</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <Label htmlFor="username">Usuario</Label>
             <Input id="username" {...register('username')} autoComplete="username" />
             {errors.username && (
-              <p className="text-sm text-destructive">{errors.username.message}</p>
+              <p className="text-xs text-destructive">{errors.username.message}</p>
             )}
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <Label htmlFor="password">Contraseña</Label>
             <Input id="password" type="password" {...register('password')} autoComplete="current-password" />
             {errors.password && (
-              <p className="text-sm text-destructive">{errors.password.message}</p>
+              <p className="text-xs text-destructive">{errors.password.message}</p>
             )}
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p className="text-xs text-destructive">{error}</p>}
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting ? 'Ingresando...' : 'Ingresar'}
           </Button>

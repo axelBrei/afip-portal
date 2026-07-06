@@ -86,7 +86,7 @@ export function SettingsForm() {
             <span className="text-muted-foreground">Certificado</span>
             <div className="flex items-center gap-1">
               <CertIcon
-                className={`h-4 w-4 ${data.certStatus.loaded ? 'text-green-500' : 'text-destructive'}`}
+                className={`h-4 w-4 ${data.certStatus.loaded ? 'text-[#27a644]' : 'text-destructive'}`}
               />
               <span>{data.certStatus.loaded ? `Cargado (${data.certStatus.source})` : 'No encontrado'}</span>
             </div>
@@ -106,7 +106,7 @@ export function SettingsForm() {
             <Input id="key-file" type="file" accept=".key,.pem" ref={keyRef} />
           </div>
           {uploadResult && (
-            <div className={`flex items-center gap-2 text-sm ${uploadResult.ok ? 'text-green-600' : 'text-destructive'}`}>
+            <div className={`flex items-center gap-2 text-sm ${uploadResult.ok ? 'text-[#27a644]' : 'text-destructive'}`}>
               {uploadResult.ok ? <CheckCircle className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
               {uploadResult.message}
             </div>

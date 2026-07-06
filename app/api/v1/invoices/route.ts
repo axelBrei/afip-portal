@@ -8,6 +8,8 @@ import { z } from 'zod'
 import { desc } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 
+console.log('[invoices/route] module loaded')
+
 const ivaItemSchema = z.object({
   Id: z.number().int(),
   BaseImp: z.number(),
@@ -50,34 +52,44 @@ function caeDateToIso(arcaDate: string): string {
 }
 
 export async function GET(request: NextRequest) {
+  console.log('[GET /api/v1/invoices] handler entered')
   const { searchParams } = new URL(request.url)
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '20', 10)))
   const offset = (page - 1) * limit
 
-  const rows = await db
-    .select()
-    .from(invoices)
-    .orderBy(desc(invoices.createdAt))
-    .limit(limit)
-    .offset(offset)
+  try {
+    const rows = await db
+      .select()
+      .from(invoices)
+      .orderBy(desc(invoices.createdAt))
+      .limit(limit)
+      .offset(offset)
 
-  return NextResponse.json({ data: rows, page, limit })
+    console.log(`[GET /api/v1/invoices] page=${page} limit=${limit} returned=${rows.length}`)
+    return NextResponse.json({ data: rows, page, limit })
+  } catch (err) {
+    console.error('[GET /api/v1/invoices] DB error:', err)
+    return NextResponse.json({ error: 'Failed to fetch invoices' }, { status: 500 })
+  }
 }
 
 export async function POST(request: NextRequest) {
   const arcaCuit = process.env.ARCA_CUIT
   if (!arcaCuit) {
+    console.error('[POST /api/v1/invoices] ARCA_CUIT not configured')
     return NextResponse.json({ error: 'ARCA_CUIT not configured' }, { status: 503 })
   }
 
   const body = await request.json().catch(() => null)
   const parsed = createSchema.safeParse(body)
   if (!parsed.success) {
+    console.error('[POST /api/v1/invoices] Validation error:', parsed.error.flatten())
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
   }
 
   const data = parsed.data
+  console.log(`[POST /api/v1/invoices] tipoCbte=${data.tipoCbte} puntoVenta=${data.puntoVenta} impTotal=${data.impTotal}`)
   const arca = arcaService.getClient()
   const today = toArcaDate(new Date())
 
@@ -106,10 +118,17 @@ export async function POST(request: NextRequest) {
     }),
   }
 
-  const result = await arca.electronicBillingService.createNextVoucher(voucherPayload)
+  let result
+  try {
+    result = await arca.electronicBillingService.createNextVoucher(voucherPayload)
+  } catch (err) {
+    console.error('[POST /api/v1/invoices] ARCA createNextVoucher error:', err)
+    return NextResponse.json({ error: 'ARCA service error', details: String(err) }, { status: 502 })
+  }
 
   const cabResultado = result.response.FeCabResp?.Resultado
   if (cabResultado !== 'A') {
+    console.error('[POST /api/v1/invoices] ARCA rejected:', result.response)
     return NextResponse.json(
       { error: 'ARCA rejected the invoice', details: result.response },
       { status: 422 }
@@ -120,6 +139,7 @@ export async function POST(request: NextRequest) {
   const nroCbte = detResp?.CbteDesde ?? detResp?.CbteHasta ?? 0
   const cae = result.cae
   const caeFchVto = result.caeFchVto
+  console.log(`[POST /api/v1/invoices] ARCA approved nroCbte=${nroCbte} cae=${cae}`)
 
   const cbteLetra = data.tipoCbte <= 3 ? 'A' : data.tipoCbte <= 8 ? 'B' : 'C'
   const pdfGen = new InvoicePdfGenerator({ includeQr: true })
@@ -163,7 +183,14 @@ export async function POST(request: NextRequest) {
   const id = randomUUID()
   const year = new Date().getFullYear()
   const pdfKey = `invoices/${arcaCuit}/${year}/${id}.pdf`
-  await uploadPdf(pdfKey, pdfBuffer)
+
+  try {
+    await uploadPdf(pdfKey, pdfBuffer)
+    console.log(`[POST /api/v1/invoices] PDF uploaded to ${pdfKey}`)
+  } catch (err) {
+    console.error('[POST /api/v1/invoices] R2 upload error:', err)
+    return NextResponse.json({ error: 'Failed to upload PDF', details: String(err) }, { status: 500 })
+  }
 
   const [invoice] = await db
     .insert(invoices)
@@ -186,5 +213,6 @@ export async function POST(request: NextRequest) {
     })
     .returning()
 
+  console.log(`[POST /api/v1/invoices] Created invoice id=${invoice.id}`)
   return NextResponse.json(invoice, { status: 201 })
 }

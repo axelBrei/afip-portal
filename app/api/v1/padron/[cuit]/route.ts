@@ -41,14 +41,17 @@ export async function GET(
       .limit(1)
 
     if (cached[0] && new Date(cached[0].expiresAt) > new Date()) {
+      console.log(`[GET /api/v1/padron/${cuit}] Cache hit scope=${scope}`)
       return NextResponse.json({ data: cached[0].data, cached: true })
     }
 
+    console.log(`[GET /api/v1/padron/${cuit}] Cache miss, fetching from ARCA scope=${scope}`)
     const arca = arcaService.getClient()
     const service = getService(arca, scope)
     const taxpayer = await service.getTaxpayerDetails(parseInt(cuit, 10))
 
     if (!taxpayer) {
+      console.log(`[GET /api/v1/padron/${cuit}] Taxpayer not found in ARCA`)
       return NextResponse.json({ error: 'Taxpayer not found' }, { status: 404 })
     }
 
@@ -63,8 +66,10 @@ export async function GET(
         set: { data: taxpayer, fetchedAt: now, expiresAt },
       })
 
+    console.log(`[GET /api/v1/padron/${cuit}] Fetched and cached`)
     return NextResponse.json({ data: taxpayer, cached: false })
-  } catch {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } catch (err) {
+    console.error(`[GET /api/v1/padron/${cuit}] Error:`, err)
+    return NextResponse.json({ error: 'Internal server error', details: String(err) }, { status: 500 })
   }
 }
