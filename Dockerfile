@@ -39,6 +39,9 @@ COPY --chown=nextjs:nodejs --from=builder /app/lib/db/schema.ts ./lib/db/schema.
 
 RUN mkdir -p /data/certs && chown nextjs:nodejs /data/certs
 
+# Tell puppeteer where to find the system chromium (cosmiconfig reads this before env vars)
+RUN echo 'module.exports = { executablePath: "/usr/bin/chromium-browser" };' > /app/.puppeteerrc.cjs
+
 USER nextjs
 EXPOSE 3000
 CMD ["node", "server.js"]
