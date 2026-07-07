@@ -9,12 +9,12 @@ import { useMutation } from '@tanstack/react-query'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
+import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { Trash2, Plus } from 'lucide-react'
+import { Trash2, Plus, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const IVA_RATES = [
@@ -49,8 +49,6 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>
 
-type Step = 'receptor' | 'items' | 'preview' | 'done'
-
 type InvoicePayload = {
   puntoVenta: number
   tipoCbte: number
@@ -72,8 +70,7 @@ type InvoicePayload = {
 }
 
 function todayIso() {
-  const d = new Date()
-  return d.toISOString().slice(0, 10)
+  return new Date().toISOString().slice(0, 10)
 }
 
 function firstDayOfMonthIso() {
@@ -109,19 +106,23 @@ function calcTotals(items: FormData['items']) {
     impIva: Math.round(iva * 100) / 100,
     impTotal: Math.round((net + iva) * 100) / 100,
     ivaBreakdown: Object.entries(ivaMap).map(([id, v]) => ({
-      Id: parseInt(id, 10), BaseImp: Math.round(v.BaseImp * 100) / 100, Importe: Math.round(v.Importe * 100) / 100,
+      Id: parseInt(id, 10),
+      BaseImp: Math.round(v.BaseImp * 100) / 100,
+      Importe: Math.round(v.Importe * 100) / 100,
     })),
   }
 }
 
 export function InvoiceForm() {
-  const [step, setStep] = useState<Step>('receptor')
   const [receptorName, setReceptorName] = useState<string | null>(null)
   const [lookingUp, setLookingUp] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [createdInvoice, setCreatedInvoice] = useState<any>(null)
 
-  const { register, control, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
+  const {
+    register, control, handleSubmit, watch, setValue,
+    formState: { errors },
+  } = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       tipoCbte: 11,
@@ -138,13 +139,11 @@ export function InvoiceForm() {
   const watchedItems = watch('items')
   const watchedCuit = watch('receptorCuit')
   const watchedTipoCbte = watch('tipoCbte')
+  const totals = calcTotals(watchedItems ?? [])
 
-  // Fix 2: Auto-trigger padron lookup when CUIT reaches 11 digits
   useEffect(() => {
-    if (/^\d{11}$/.test(watchedCuit ?? '')) {
-      lookupCuit()
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (/^\d{11}$/.test(watchedCuit ?? '')) lookupCuit()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedCuit])
 
   async function lookupCuit() {
@@ -155,15 +154,13 @@ export function InvoiceForm() {
       const res = await fetch(`/api/v1/padron/${cuit}`)
       if (res.ok) {
         const body = await res.json()
-        const name = body.data?.persona?.denominacion ?? body.data?.persona?.apellido ?? null
-        setReceptorName(name)
+        setReceptorName(body.data?.persona?.denominacion ?? body.data?.persona?.apellido ?? null)
       }
     } finally {
       setLookingUp(false)
     }
   }
 
-  // Fix 1: Replace raw fetch with useMutation
   const createInvoice = useMutation({
     mutationFn: async (payload: InvoicePayload) => {
       const res = await fetch('/api/v1/invoices', {
@@ -174,19 +171,14 @@ export function InvoiceForm() {
       if (!res.ok) throw new Error(await res.text())
       return res.json()
     },
-    onSuccess: (invoice) => {
-      setStep('done')
-      setCreatedInvoice(invoice)
-    },
-    onError: (err) => {
-      setSubmitError(err instanceof Error ? err.message : 'Error al crear factura')
-    },
+    onSuccess: (invoice) => setCreatedInvoice(invoice),
+    onError: (err) => setSubmitError(err instanceof Error ? err.message : 'Error al crear factura'),
   })
 
   function onSubmit(data: FormData) {
     setSubmitError(null)
-    const totals = calcTotals(data.items)
-    const payload: InvoicePayload = {
+    const t = calcTotals(data.items)
+    createInvoice.mutate({
       puntoVenta: data.puntoVenta,
       tipoCbte: data.tipoCbte,
       concepto: 2,
@@ -198,12 +190,12 @@ export function InvoiceForm() {
       })(),
       receptorCuit: data.receptorCuit,
       receptorName: receptorName ?? undefined,
-      impNeto: totals.impNeto,
-      impIva: totals.impIva,
-      impTotal: totals.impTotal,
+      impNeto: t.impNeto,
+      impIva: t.impIva,
+      impTotal: t.impTotal,
       monId: 'PES',
       monCotiz: 1,
-      iva: totals.ivaBreakdown,
+      iva: t.ivaBreakdown,
       fchServDesde: data.fchServDesde.replace(/-/g, ''),
       fchServHasta: data.fchServHasta.replace(/-/g, ''),
       fchVtoPago: data.fchVtoPago.replace(/-/g, ''),
@@ -211,198 +203,183 @@ export function InvoiceForm() {
         description: i.description,
         quantity: i.quantity,
         unitPrice: i.unitPrice,
-        ivaRate: IVA_RATES.find((r) => r.id === i.ivaRateId)?.rate ?? 21,
+        ivaRate: IVA_RATES.find((r) => r.id === i.ivaRateId)?.rate ?? 0,
       })),
-    }
-    createInvoice.mutate(payload)
+    })
   }
 
-  const totals = calcTotals(watchedItems ?? [])
-
-  // Fix 3: Done step
-  if (step === 'done' && createdInvoice) {
+  if (createdInvoice) {
     return (
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold">Factura autorizada</h2>
-        <p>CAE: <strong>{createdInvoice.cae}</strong></p>
-        <p>Vence: {createdInvoice.caeFchVto}</p>
-        <div className="flex gap-2">
-          <a href={`/api/v1/invoices/${createdInvoice.id}/pdf`} target="_blank" rel="noopener noreferrer">
-            Descargar PDF
-          </a>
-          <Link href="/invoices" className={cn(buttonVariants({ variant: 'outline' }))}>
-            Volver a facturas
+      <Card className="max-w-lg">
+        <CardContent className="pt-6 space-y-3">
+          <p className="text-sm text-muted-foreground">Factura autorizada</p>
+          <p className="font-mono text-lg font-semibold">{createdInvoice.cae}</p>
+          <p className="text-sm text-muted-foreground">Vence {createdInvoice.caeFchVto}</p>
+        </CardContent>
+        <CardFooter className="gap-2">
+          {createdInvoice.pdfUrl && (
+            <a
+              href={`/api/v1/invoices/${createdInvoice.id}/pdf`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(buttonVariants({ size: 'sm' }))}
+            >
+              <Download className="h-4 w-4 mr-1.5" />
+              Descargar PDF
+            </a>
+          )}
+          <Link href="/invoices" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
+            Ver facturas
           </Link>
-        </div>
-      </div>
+        </CardFooter>
+      </Card>
     )
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)}>
-      {step === 'receptor' && (
-        <Card>
-          <CardHeader><CardTitle>Paso 1: Receptor</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label>Tipo de comprobante</Label>
-                {/* Fix 4: controlled value prop */}
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-w-2xl">
+      {/* Comprobante */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label>Tipo de comprobante</Label>
+          <Select
+            value={watchedTipoCbte?.toString() ?? '11'}
+            onValueChange={(v) => v && setValue('tipoCbte', parseInt(v, 10))}
+          >
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {CBTE_TYPES.map((t) => (
+                <SelectItem key={t.id} value={t.id.toString()}>{t.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Punto de venta</Label>
+          <Input type="number" {...register('puntoVenta')} />
+          {errors.puntoVenta && <p className="text-xs text-destructive">{errors.puntoVenta.message}</p>}
+        </div>
+      </div>
+
+      {/* Receptor */}
+      <div className="space-y-1.5">
+        <Label>CUIT receptor <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+        <div className="flex gap-2">
+          <Input {...register('receptorCuit')} placeholder="20111111112" maxLength={11} />
+          <Button type="button" variant="outline" onClick={lookupCuit} disabled={lookingUp}>
+            {lookingUp ? 'Buscando...' : 'Buscar'}
+          </Button>
+        </div>
+        {receptorName && <p className="text-sm text-muted-foreground">{receptorName}</p>}
+      </div>
+
+      {/* Período */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="space-y-1.5">
+          <Label>Período desde</Label>
+          <Input type="date" {...register('fchServDesde')} />
+          {errors.fchServDesde && <p className="text-xs text-destructive">{errors.fchServDesde.message}</p>}
+        </div>
+        <div className="space-y-1.5">
+          <Label>Período hasta</Label>
+          <Input type="date" {...register('fchServHasta')} />
+          {errors.fchServHasta && <p className="text-xs text-destructive">{errors.fchServHasta.message}</p>}
+        </div>
+        <div className="space-y-1.5">
+          <Label>Vto. pago</Label>
+          <Input type="date" {...register('fchVtoPago')} />
+          {errors.fchVtoPago && <p className="text-xs text-destructive">{errors.fchVtoPago.message}</p>}
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Ítems */}
+      <div className="space-y-2">
+        <div className="grid grid-cols-12 gap-2 text-xs text-muted-foreground px-1">
+          <span className="col-span-5">Descripción</span>
+          <span className="col-span-2">Cantidad</span>
+          <span className="col-span-2">Precio unit.</span>
+          <span className="col-span-2">IVA</span>
+        </div>
+        {fields.map((field, idx) => {
+          const ivaRateId = watch(`items.${idx}.ivaRateId`)
+          return (
+            <div key={field.id} className="grid grid-cols-12 gap-2 items-center">
+              <div className="col-span-5">
+                <Input {...register(`items.${idx}.description`)} placeholder="Descripción" />
+              </div>
+              <div className="col-span-2">
+                <Input type="number" step="0.01" {...register(`items.${idx}.quantity`)} />
+              </div>
+              <div className="col-span-2">
+                <Input type="number" step="0.01" {...register(`items.${idx}.unitPrice`)} />
+              </div>
+              <div className="col-span-2">
                 <Select
-                  value={watchedTipoCbte?.toString() ?? '6'}
-                  onValueChange={(v) => { if (v != null) setValue('tipoCbte', parseInt(v, 10)) }}
+                  value={String(ivaRateId ?? 3)}
+                  onValueChange={(v) => v && setValue(`items.${idx}.ivaRateId`, parseInt(v, 10))}
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {CBTE_TYPES.map((t) => (
-                      <SelectItem key={t.id} value={t.id.toString()}>{t.label}</SelectItem>
+                    {IVA_RATES.map((r) => (
+                      <SelectItem key={r.id} value={r.id.toString()}>{r.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1">
-                <Label>Punto de venta</Label>
-                <Input type="number" {...register('puntoVenta')} />
-                {errors.puntoVenta && <p className="text-sm text-destructive">{errors.puntoVenta.message}</p>}
+              <div className="col-span-1 flex justify-center">
+                {fields.length > 1 && (
+                  <Button type="button" variant="ghost" size="icon" onClick={() => remove(idx)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </div>
-            <div className="space-y-1">
-              <Label>CUIT receptor (opcional)</Label>
-              <div className="flex gap-2">
-                <Input
-                  {...register('receptorCuit')}
-                  placeholder="20111111112"
-                  maxLength={11}
-                />
-                <Button type="button" variant="outline" onClick={lookupCuit} disabled={lookingUp}>
-                  {lookingUp ? 'Buscando...' : 'Buscar'}
-                </Button>
-              </div>
-              {receptorName && (
-                <p className="text-sm text-muted-foreground">{receptorName}</p>
-              )}
-            </div>
-            <Separator />
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <Label>Período desde</Label>
-                <Input type="date" {...register('fchServDesde')} />
-                {errors.fchServDesde && <p className="text-sm text-destructive">{errors.fchServDesde.message}</p>}
-              </div>
-              <div className="space-y-1">
-                <Label>Período hasta</Label>
-                <Input type="date" {...register('fchServHasta')} />
-                {errors.fchServHasta && <p className="text-sm text-destructive">{errors.fchServHasta.message}</p>}
-              </div>
-              <div className="space-y-1">
-                <Label>Vto. pago</Label>
-                <Input type="date" {...register('fchVtoPago')} />
-                {errors.fchVtoPago && <p className="text-sm text-destructive">{errors.fchVtoPago.message}</p>}
-              </div>
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button type="button" onClick={() => setStep('items')}>Siguiente</Button>
-          </CardFooter>
-        </Card>
-      )}
+          )
+        })}
+        {errors.items && <p className="text-xs text-destructive">{errors.items.message}</p>}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground"
+          onClick={() => append({ description: '', quantity: 1, unitPrice: 0, ivaRateId: 3 })}
+        >
+          <Plus className="h-4 w-4 mr-1" />
+          Agregar ítem
+        </Button>
+      </div>
 
-      {step === 'items' && (
-        <Card>
-          <CardHeader><CardTitle>Paso 2: Ítems</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            {fields.map((field, idx) => {
-              const ivaRateId = watch(`items.${idx}.ivaRateId`)
-              return (
-                <div key={field.id} className="grid grid-cols-12 gap-2 items-end">
-                  <div className="col-span-4 space-y-1">
-                    {idx === 0 && <Label>Descripción</Label>}
-                    <Input {...register(`items.${idx}.description`)} placeholder="Descripción" />
-                  </div>
-                  <div className="col-span-2 space-y-1">
-                    {idx === 0 && <Label>Cantidad</Label>}
-                    <Input type="number" step="0.01" {...register(`items.${idx}.quantity`)} />
-                  </div>
-                  <div className="col-span-2 space-y-1">
-                    {idx === 0 && <Label>Precio unit.</Label>}
-                    <Input type="number" step="0.01" {...register(`items.${idx}.unitPrice`)} />
-                  </div>
-                  <div className="col-span-3 space-y-1">
-                    {idx === 0 && <Label>IVA</Label>}
-                    {/* Fix 4: controlled value prop */}
-                    <Select
-                      value={ivaRateId?.toString() ?? '5'}
-                      onValueChange={(v) => { if (v != null) setValue(`items.${idx}.ivaRateId`, parseInt(v, 10)) }}
-                    >
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {IVA_RATES.map((r) => (
-                          <SelectItem key={r.id} value={r.id.toString()}>{r.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-1">
-                    {fields.length > 1 && (
-                      <Button type="button" variant="ghost" size="icon" onClick={() => remove(idx)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-            {errors.items && <p className="text-sm text-destructive">{errors.items.message}</p>}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => append({ description: '', quantity: 1, unitPrice: 0, ivaRateId: 5 })}
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Agregar ítem
-            </Button>
-          </CardContent>
-          <CardFooter className="gap-2">
-            <Button type="button" variant="outline" onClick={() => setStep('receptor')}>Atrás</Button>
-            <Button type="button" onClick={() => setStep('preview')}>Ver resumen</Button>
-          </CardFooter>
-        </Card>
-      )}
+      <Separator />
 
-      {step === 'preview' && (
-        <Card>
-          <CardHeader><CardTitle>Paso 3: Resumen</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            {receptorName && (
-              <p className="text-sm"><span className="font-medium">Receptor:</span> {receptorName} ({watchedCuit})</p>
-            )}
-            <Separator />
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Neto gravado</span>
-                <span className="font-mono">${totals.impNeto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">IVA</span>
-                <span className="font-mono">${totals.impIva.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between font-semibold">
-                <span>Total</span>
-                <span className="font-mono">${totals.impTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-              </div>
-            </div>
-            {submitError && <p className="text-sm text-destructive">{submitError}</p>}
-          </CardContent>
-          <CardFooter className="gap-2">
-            <Button type="button" variant="outline" onClick={() => setStep('items')}>Atrás</Button>
-            <Button type="submit" disabled={createInvoice.isPending}>
-              {createInvoice.isPending ? 'Autorizando...' : 'Autorizar factura'}
-            </Button>
-          </CardFooter>
-        </Card>
-      )}
+      {/* Totales */}
+      <div className="space-y-1 text-sm max-w-xs ml-auto">
+        <div className="flex justify-between text-muted-foreground">
+          <span>Neto gravado</span>
+          <span className="font-mono">${totals.impNeto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+        </div>
+        <div className="flex justify-between text-muted-foreground">
+          <span>IVA</span>
+          <span className="font-mono">${totals.impIva.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+        </div>
+        <Separator />
+        <div className="flex justify-between font-semibold">
+          <span>Total</span>
+          <span className="font-mono">${totals.impTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+        </div>
+      </div>
+
+      {submitError && <p className="text-sm text-destructive">{submitError}</p>}
+
+      <div className="flex gap-2">
+        <Button type="submit" disabled={createInvoice.isPending}>
+          {createInvoice.isPending ? 'Autorizando...' : 'Autorizar factura'}
+        </Button>
+        <Link href="/invoices" className={cn(buttonVariants({ variant: 'outline' }))}>
+          Cancelar
+        </Link>
+      </div>
     </form>
   )
 }
