@@ -42,7 +42,7 @@ function loadPersistedEnv(): ArcaEnv {
     // fall through to default
   }
   const fromEnvVar = process.env.ARCA_ENV
-  return fromEnvVar === 'sandbox' ? 'sandbox' : 'production'
+  return fromEnvVar === 'production' ? 'production' : 'sandbox'
 }
 
 function persistEnv(env: ArcaEnv) {
