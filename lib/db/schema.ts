@@ -17,6 +17,7 @@ export const invoices = pgTable('invoices', {
   amountTotal: numeric('amount_total', { precision: 12, scale: 2 }).notNull(),
   receptorCuit: varchar('receptor_cuit', { length: 11 }),
   receptorName: varchar('receptor_name', { length: 255 }),
+  arcaEnv: varchar('arca_env', { length: 10 }).notNull().default('sandbox'),
   pdfUrl: text('pdf_url'),
   rawRequest: jsonb('raw_request').notNull(),
   rawResponse: jsonb('raw_response').notNull(),

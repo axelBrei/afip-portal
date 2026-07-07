@@ -5,7 +5,7 @@ import { arcaService } from '@/lib/arca/service'
 import { uploadPdf } from '@/lib/r2/client'
 import { InvoicePdfGenerator } from '@arcasdk/pdf'
 import { z } from 'zod'
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 
 console.log('[invoices/route] module loaded')
@@ -57,16 +57,18 @@ export async function GET(request: NextRequest) {
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '20', 10)))
   const offset = (page - 1) * limit
+  const activeEnv = arcaService.getActiveEnv()
 
   try {
     const rows = await db
       .select()
       .from(invoices)
+      .where(eq(invoices.arcaEnv, activeEnv))
       .orderBy(desc(invoices.createdAt))
       .limit(limit)
       .offset(offset)
 
-    console.log(`[GET /api/v1/invoices] page=${page} limit=${limit} returned=${rows.length}`)
+    console.log(`[GET /api/v1/invoices] env=${activeEnv} page=${page} limit=${limit} returned=${rows.length}`)
     return NextResponse.json({ data: rows, page, limit })
   } catch (err) {
     console.error('[GET /api/v1/invoices] DB error:', err)
@@ -159,6 +161,7 @@ export async function POST(request: NextRequest) {
       amountNet: data.impNeto.toString(),
       amountIva: data.impIva.toString(),
       amountTotal: data.impTotal.toString(),
+      arcaEnv: arcaService.getActiveEnv(),
       receptorCuit: data.receptorCuit,
       receptorName: data.receptorName,
       pdfUrl: null,

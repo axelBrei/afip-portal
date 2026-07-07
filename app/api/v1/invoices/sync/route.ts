@@ -35,10 +35,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ lastNro: 0, missing: 0, synced: 0 })
   }
 
+  const activeEnv = arcaService.getActiveEnv()
+
   const existing = await db
     .select({ nroCbte: invoices.nroCbte })
     .from(invoices)
-    .where(and(eq(invoices.tipoCbte, tipoCbte), eq(invoices.puntoVenta, puntoVenta), eq(invoices.cuit, arcaCuit)))
+    .where(and(eq(invoices.tipoCbte, tipoCbte), eq(invoices.puntoVenta, puntoVenta), eq(invoices.cuit, arcaCuit), eq(invoices.arcaEnv, activeEnv)))
 
   const existingSet = new Set(existing.map((r) => r.nroCbte))
 
@@ -62,6 +64,7 @@ export async function POST(request: NextRequest) {
       await db.insert(invoices).values({
         id: randomUUID(),
         cuit: arcaCuit,
+        arcaEnv: activeEnv,
         tipoCbte,
         puntoVenta,
         nroCbte: nro,
