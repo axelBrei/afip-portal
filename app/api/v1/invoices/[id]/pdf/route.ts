@@ -1,8 +1,83 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { invoices } from '@/lib/db/schema'
-import { getPresignedUrl } from '@/lib/r2/client'
+import { getPresignedUrl, uploadPdf } from '@/lib/r2/client'
+import { InvoicePdfGenerator } from '@arcasdk/pdf'
 import { eq } from 'drizzle-orm'
+
+export const dynamic = 'force-dynamic'
+
+export async function POST(
+  _request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const arcaCuit = process.env.ARCA_CUIT
+  if (!arcaCuit) return NextResponse.json({ error: 'ARCA_CUIT not configured' }, { status: 503 })
+
+  const rows = await db.select().from(invoices).where(eq(invoices.id, params.id)).limit(1)
+  const invoice = rows[0]
+  if (!invoice) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (invoice.pdfUrl) return NextResponse.json({ error: 'PDF already exists' }, { status: 409 })
+
+  const raw = invoice.rawRequest as Record<string, any>
+  const docTipo: number = raw.DocTipo ?? 99
+  const docNro: number = raw.DocNro ?? 0
+  const storedItems: { description: string; quantity: number; unitPrice: number; ivaRate: number }[] =
+    raw._items ?? [{ description: 'Honorarios', quantity: 1, unitPrice: Number(invoice.amountTotal), ivaRate: 0 }]
+
+  const cbteLetra = invoice.tipoCbte <= 3 ? 'A' : invoice.tipoCbte <= 8 ? 'B' : 'C'
+  const cbteFecha = invoice.createdAt.toISOString().slice(0, 10).replace(/-/g, '')
+
+  try {
+    const pdfGen = new InvoicePdfGenerator({ includeQr: true })
+    const pdfBuffer = await pdfGen.generate({
+      emisor: {
+        cuit: arcaCuit,
+        razonSocial: process.env.ARCA_RAZON_SOCIAL ?? '',
+        domicilioComercial: process.env.ARCA_DOMICILIO ?? '',
+        condicionIva: process.env.ARCA_CONDICION_IVA ?? 'Responsable Inscripto',
+        iibb: process.env.ARCA_IIBB ?? '',
+        fechaInicioActividades: process.env.ARCA_INICIO_ACTIVIDADES ?? '',
+      },
+      receptor: {
+        razonSocial: invoice.receptorName ?? 'Consumidor Final',
+        condicionIva: docTipo === 80 ? 'Responsable Inscripto' : 'Consumidor Final',
+        documentoTipo: docTipo === 80 ? 'CUIT' : 'DNI',
+        documentoNro: String(docNro),
+      },
+      cbteTipo: invoice.tipoCbte,
+      cbteLetra,
+      puntoVenta: invoice.puntoVenta,
+      cbteDesde: invoice.nroCbte,
+      cbteHasta: invoice.nroCbte,
+      cbteFecha,
+      concepto: raw.Concepto ?? 2,
+      items: storedItems.map((item) => ({
+        descripcion: item.description,
+        cantidad: item.quantity,
+        precioUnitario: item.unitPrice,
+        unidadMedida: 'u',
+        subtotal: item.quantity * item.unitPrice,
+        alicuotaIva: item.ivaRate,
+      })),
+      importeNetoGravado: Number(invoice.amountNet),
+      importeIva: Number(invoice.amountIva),
+      importeTotal: Number(invoice.amountTotal),
+      cae: invoice.cae,
+      caeFechaVencimiento: invoice.caeFchVto,
+    })
+
+    const year = invoice.createdAt.getFullYear()
+    const pdfKey = `invoices/${arcaCuit}/${year}/${invoice.id}.pdf`
+    await uploadPdf(pdfKey, pdfBuffer)
+    await db.update(invoices).set({ pdfUrl: pdfKey }).where(eq(invoices.id, invoice.id))
+    console.log(`[POST /api/v1/invoices/${invoice.id}/pdf] Generated and saved ${pdfKey}`)
+    return NextResponse.json({ ok: true, pdfUrl: pdfKey })
+  } catch (err) {
+    console.error(`[POST /api/v1/invoices/${invoice.id}/pdf] Error:`, err)
+    return NextResponse.json({ error: 'PDF generation failed', details: String(err) }, { status: 500 })
+  }
+}
 
 export async function GET(
   _request: NextRequest,

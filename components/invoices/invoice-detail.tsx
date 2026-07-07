@@ -1,11 +1,12 @@
 'use client'
 
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { useSuspenseQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { buttonVariants } from '@/components/ui/button'
-import { Download } from 'lucide-react'
+import { Download, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Invoice } from '@/lib/db/schema'
 
@@ -16,10 +17,31 @@ async function fetchInvoice(id: string): Promise<Invoice> {
 }
 
 export function InvoiceDetail({ id }: { id: string }) {
+  const queryClient = useQueryClient()
   const { data: invoice } = useSuspenseQuery({
     queryKey: ['invoice', id],
     queryFn: () => fetchInvoice(id),
   })
+  const [generating, setGenerating] = useState(false)
+  const [genError, setGenError] = useState<string | null>(null)
+
+  async function handleGeneratePdf() {
+    setGenerating(true)
+    setGenError(null)
+    try {
+      const res = await fetch(`/api/v1/invoices/${id}/pdf`, { method: 'POST' })
+      if (res.ok) {
+        await queryClient.invalidateQueries({ queryKey: ['invoice', id] })
+      } else {
+        const body = await res.json().catch(() => ({}))
+        setGenError(body.error ?? 'Error al generar PDF')
+      }
+    } catch {
+      setGenError('Error de red')
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   return (
     <Card className="max-w-2xl mx-auto">
@@ -30,7 +52,7 @@ export function InvoiceDetail({ id }: { id: string }) {
         </CardTitle>
         <div className="flex items-center gap-2">
           <Badge>CAE: {invoice.cae}</Badge>
-          {invoice.pdfUrl && (
+          {invoice.pdfUrl ? (
             <a
               href={`/api/v1/invoices/${invoice.id}/pdf`}
               target="_blank"
@@ -40,9 +62,15 @@ export function InvoiceDetail({ id }: { id: string }) {
               <Download className="h-4 w-4 mr-1" />
               PDF
             </a>
+          ) : (
+            <Button size="sm" variant="outline" onClick={handleGeneratePdf} disabled={generating}>
+              <FileText className="h-4 w-4 mr-1" />
+              {generating ? 'Generando...' : 'Generar PDF'}
+            </Button>
           )}
         </div>
       </CardHeader>
+      {genError && <p className="px-6 pb-2 text-sm text-destructive">{genError}</p>}
       <CardContent className="space-y-4 text-sm">
         <div className="grid grid-cols-2 gap-4">
           <div>

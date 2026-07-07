@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
       receptorCuit: data.receptorCuit,
       receptorName: data.receptorName,
       pdfUrl: null,
-      rawRequest: voucherPayload,
+      rawRequest: { ...voucherPayload, _items: data.items },
       rawResponse: result.response,
     })
     .returning()
