@@ -101,9 +101,10 @@ export function InvoiceForm() {
   const { register, control, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      tipoCbte: 6,
+      tipoCbte: 11,
       puntoVenta: 1,
-      items: [{ description: '', quantity: 1, unitPrice: 0, ivaRateId: 5 }],
+      receptorCuit: '30715446142',
+      items: [{ description: 'Honorarios', quantity: 1, unitPrice: 0, ivaRateId: 3 }],
     },
   })
 
@@ -164,7 +165,11 @@ export function InvoiceForm() {
       tipoCbte: data.tipoCbte,
       concepto: 2,
       docTipo: data.receptorCuit ? 80 : 99,
-      docNro: data.receptorCuit ? parseInt(data.receptorCuit, 10) : 0,
+      docNro: (() => {
+        if (!data.receptorCuit) return 0
+        const n = parseInt(data.receptorCuit.replace(/\D/g, ''), 10)
+        return Number.isFinite(n) ? n : 0
+      })(),
       receptorCuit: data.receptorCuit,
       receptorName: receptorName ?? undefined,
       impNeto: totals.impNeto,
