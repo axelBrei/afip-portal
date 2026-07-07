@@ -25,6 +25,9 @@ const INVOICE_TYPE_LABELS: Record<number, string> = {
 }
 
 const SYNC_TYPES = [
+  { tipoCbte: 1, puntoVenta: 1 },
+  { tipoCbte: 6, puntoVenta: 1 },
+  { tipoCbte: 11, puntoVenta: 1 },
   { tipoCbte: 1, puntoVenta: 2 },
   { tipoCbte: 6, puntoVenta: 2 },
   { tipoCbte: 11, puntoVenta: 2 },
