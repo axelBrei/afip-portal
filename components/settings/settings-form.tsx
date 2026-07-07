@@ -19,6 +19,7 @@ interface CertStatus {
 
 interface SettingsData {
   cuit: string
+  portalUser: string | null
   activeEnv: ArcaEnv
   certStatus: { production: CertStatus; sandbox: CertStatus }
 }
@@ -139,7 +140,14 @@ export function SettingsForm() {
         <CardContent className="space-y-3 text-sm">
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">CUIT</span>
-            <span className="font-mono font-medium">{data.cuit}</span>
+            <span className="font-mono font-medium">{data.cuit ?? <span className="text-destructive">No configurado</span>}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Usuario portal</span>
+            {data.portalUser
+              ? <span className="font-mono font-medium">{data.portalUser}</span>
+              : <span className="text-destructive text-sm flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" />PORTAL_USER no configurado</span>
+            }
           </div>
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Entorno activo</span>

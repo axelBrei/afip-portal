@@ -13,6 +13,7 @@ export async function GET() {
   console.log(`[GET /api/v1/settings] cuit=${process.env.ARCA_CUIT ?? 'unset'} activeEnv=${activeEnv}`)
   return NextResponse.json({
     cuit: process.env.ARCA_CUIT,
+    portalUser: process.env.PORTAL_USER ?? null,
     activeEnv,
     certStatus,
   })
