@@ -11,7 +11,7 @@ export function getSessionOptions(): SessionOptions {
     password: secret,
     cookieName: 'afip-session',
     cookieOptions: {
-      secure: process.env.NODE_ENV === 'production',
+      secure: process.env.NODE_ENV === 'production' && process.env.COOKIE_SECURE !== 'false',
       httpOnly: true,
       sameSite: 'lax',
     },
