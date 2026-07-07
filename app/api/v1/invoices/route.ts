@@ -5,7 +5,7 @@ import { arcaService } from '@/lib/arca/service'
 import { uploadPdf } from '@/lib/r2/client'
 import { InvoicePdfGenerator } from '@arcasdk/pdf'
 import { z } from 'zod'
-import { desc } from 'drizzle-orm'
+import { desc, eq } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 
 console.log('[invoices/route] module loaded')
@@ -144,57 +144,8 @@ export async function POST(request: NextRequest) {
   const caeFchVto = result.caeFchVto
   console.log(`[POST /api/v1/invoices] ARCA approved nroCbte=${nroCbte} cae=${cae}`)
 
-  const cbteLetra = data.tipoCbte <= 3 ? 'A' : data.tipoCbte <= 8 ? 'B' : 'C'
-  const pdfGen = new InvoicePdfGenerator({ includeQr: true })
-  const pdfBuffer = await pdfGen.generate({
-    emisor: {
-      cuit: arcaCuit,
-      razonSocial: process.env.ARCA_RAZON_SOCIAL ?? '',
-      domicilioComercial: process.env.ARCA_DOMICILIO ?? '',
-      condicionIva: process.env.ARCA_CONDICION_IVA ?? 'Responsable Inscripto',
-      iibb: process.env.ARCA_IIBB ?? '',
-      fechaInicioActividades: process.env.ARCA_INICIO_ACTIVIDADES ?? '',
-    },
-    receptor: {
-      razonSocial: data.receptorName ?? 'Consumidor Final',
-      condicionIva: data.docTipo === 80 ? 'Responsable Inscripto' : 'Consumidor Final',
-      documentoTipo: data.docTipo === 80 ? 'CUIT' : 'DNI',
-      documentoNro: String(data.docNro),
-    },
-    cbteTipo: data.tipoCbte,
-    cbteLetra,
-    puntoVenta: data.puntoVenta,
-    cbteDesde: nroCbte,
-    cbteHasta: nroCbte,
-    cbteFecha: today,
-    concepto: data.concepto,
-    items: data.items.map((item) => ({
-      descripcion: item.description,
-      cantidad: item.quantity,
-      precioUnitario: item.unitPrice,
-      unidadMedida: 'u',
-      subtotal: item.quantity * item.unitPrice,
-      alicuotaIva: item.ivaRate,
-    })),
-    importeNetoGravado: data.impNeto,
-    importeIva: data.impIva,
-    importeTotal: data.impTotal,
-    cae,
-    caeFechaVencimiento: caeFchVto,
-  })
-
+  // Save to DB immediately so the invoice is not lost if PDF generation fails
   const id = randomUUID()
-  const year = new Date().getFullYear()
-  const pdfKey = `invoices/${arcaCuit}/${year}/${id}.pdf`
-
-  try {
-    await uploadPdf(pdfKey, pdfBuffer)
-    console.log(`[POST /api/v1/invoices] PDF uploaded to ${pdfKey}`)
-  } catch (err) {
-    console.error('[POST /api/v1/invoices] R2 upload error:', err)
-    return NextResponse.json({ error: 'Failed to upload PDF', details: String(err) }, { status: 500 })
-  }
-
   const [invoice] = await db
     .insert(invoices)
     .values({
@@ -210,12 +161,61 @@ export async function POST(request: NextRequest) {
       amountTotal: data.impTotal.toString(),
       receptorCuit: data.receptorCuit,
       receptorName: data.receptorName,
-      pdfUrl: pdfKey,
+      pdfUrl: null,
       rawRequest: voucherPayload,
       rawResponse: result.response,
     })
     .returning()
+  console.log(`[POST /api/v1/invoices] Saved invoice id=${invoice.id}`)
 
-  console.log(`[POST /api/v1/invoices] Created invoice id=${invoice.id}`)
-  return NextResponse.json(invoice, { status: 201 })
+  const cbteLetra = data.tipoCbte <= 3 ? 'A' : data.tipoCbte <= 8 ? 'B' : 'C'
+  let pdfKey: string | null = null
+  try {
+    const pdfGen = new InvoicePdfGenerator({ includeQr: true })
+    const pdfBuffer = await pdfGen.generate({
+      emisor: {
+        cuit: arcaCuit,
+        razonSocial: process.env.ARCA_RAZON_SOCIAL ?? '',
+        domicilioComercial: process.env.ARCA_DOMICILIO ?? '',
+        condicionIva: process.env.ARCA_CONDICION_IVA ?? 'Responsable Inscripto',
+        iibb: process.env.ARCA_IIBB ?? '',
+        fechaInicioActividades: process.env.ARCA_INICIO_ACTIVIDADES ?? '',
+      },
+      receptor: {
+        razonSocial: data.receptorName ?? 'Consumidor Final',
+        condicionIva: data.docTipo === 80 ? 'Responsable Inscripto' : 'Consumidor Final',
+        documentoTipo: data.docTipo === 80 ? 'CUIT' : 'DNI',
+        documentoNro: String(data.docNro),
+      },
+      cbteTipo: data.tipoCbte,
+      cbteLetra,
+      puntoVenta: data.puntoVenta,
+      cbteDesde: nroCbte,
+      cbteHasta: nroCbte,
+      cbteFecha: today,
+      concepto: data.concepto,
+      items: data.items.map((item) => ({
+        descripcion: item.description,
+        cantidad: item.quantity,
+        precioUnitario: item.unitPrice,
+        unidadMedida: 'u',
+        subtotal: item.quantity * item.unitPrice,
+        alicuotaIva: item.ivaRate,
+      })),
+      importeNetoGravado: data.impNeto,
+      importeIva: data.impIva,
+      importeTotal: data.impTotal,
+      cae,
+      caeFechaVencimiento: caeFchVto,
+    })
+    const year = new Date().getFullYear()
+    pdfKey = `invoices/${arcaCuit}/${year}/${id}.pdf`
+    await uploadPdf(pdfKey, pdfBuffer)
+    console.log(`[POST /api/v1/invoices] PDF uploaded to ${pdfKey}`)
+    await db.update(invoices).set({ pdfUrl: pdfKey }).where(eq(invoices.id, id))
+  } catch (err) {
+    console.error('[POST /api/v1/invoices] PDF generation/upload error (invoice already saved):', err)
+  }
+
+  return NextResponse.json({ ...invoice, pdfUrl: pdfKey }, { status: 201 })
 }
