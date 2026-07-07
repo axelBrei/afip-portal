@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
   const portalPasswordConfigured = !!process.env.PORTAL_PASSWORD
   const sessionSecretConfigured = !!process.env.SESSION_SECRET
   console.log(`[POST /api/v1/auth/login] PORTAL_USER=${portalUserConfigured ? `"${process.env.PORTAL_USER}"` : 'UNSET'} PORTAL_PASSWORD=${portalPasswordConfigured ? 'SET' : 'UNSET'} SESSION_SECRET=${sessionSecretConfigured ? 'SET' : 'UNSET'}`)
+  console.log(`[POST /api/v1/auth/login] headers: host=${request.headers.get('host')} x-forwarded-host=${request.headers.get('x-forwarded-host')} x-forwarded-proto=${request.headers.get('x-forwarded-proto')} origin=${request.headers.get('origin')}`)
 
   const body = await request.json().catch(() => null)
   if (!body) {

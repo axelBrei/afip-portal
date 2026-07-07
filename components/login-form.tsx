@@ -27,16 +27,25 @@ export function LoginForm() {
 
   async function onSubmit(data: FormData) {
     setError(null)
-    const res = await fetch('/api/v1/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    })
-    if (res.ok) {
-      router.push('/invoices')
-      router.refresh()
-    } else {
-      setError('Usuario o contraseña incorrectos')
+    console.log('[login] submitting', { username: data.username, url: '/api/v1/auth/login' })
+    try {
+      const res = await fetch('/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+      const body = await res.text()
+      console.log('[login] response', { status: res.status, body })
+      if (res.ok) {
+        console.log('[login] success, redirecting to /invoices')
+        router.push('/invoices')
+        router.refresh()
+      } else {
+        setError('Usuario o contraseña incorrectos')
+      }
+    } catch (err) {
+      console.error('[login] fetch error', err)
+      setError('Error de red')
     }
   }
 
