@@ -38,7 +38,8 @@ export function LoginForm() {
       console.log('[login] response', { status: res.status, body })
       if (res.ok) {
         console.log('[login] success, redirecting to /invoices')
-        window.location.href = '/invoices'
+        router.push('/invoices')
+        router.refresh()
       } else {
         setError('Usuario o contraseña incorrectos')
       }
