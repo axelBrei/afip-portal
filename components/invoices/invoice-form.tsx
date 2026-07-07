@@ -41,6 +41,9 @@ const formSchema = z.object({
   tipoCbte: z.coerce.number().int(),
   puntoVenta: z.coerce.number().int().min(1).max(9999),
   receptorCuit: z.string().optional(),
+  fchServDesde: z.string().min(1, 'Requerido'),
+  fchServHasta: z.string().min(1, 'Requerido'),
+  fchVtoPago: z.string().min(1, 'Requerido'),
   items: z.array(lineItemSchema).min(1, 'Al menos un ítem'),
 })
 
@@ -63,6 +66,26 @@ type InvoicePayload = {
   monCotiz: number
   iva: { Id: number; BaseImp: number; Importe: number }[]
   items: { description: string; quantity: number; unitPrice: number; ivaRate: number }[]
+  fchServDesde?: string
+  fchServHasta?: string
+  fchVtoPago?: string
+}
+
+function todayIso() {
+  const d = new Date()
+  return d.toISOString().slice(0, 10)
+}
+
+function firstDayOfMonthIso() {
+  const d = new Date()
+  d.setDate(1)
+  return d.toISOString().slice(0, 10)
+}
+
+function thirtyDaysFromNowIso() {
+  const d = new Date()
+  d.setDate(d.getDate() + 30)
+  return d.toISOString().slice(0, 10)
 }
 
 function calcTotals(items: FormData['items']) {
@@ -104,6 +127,9 @@ export function InvoiceForm() {
       tipoCbte: 11,
       puntoVenta: 1,
       receptorCuit: '30715446142',
+      fchServDesde: firstDayOfMonthIso(),
+      fchServHasta: todayIso(),
+      fchVtoPago: thirtyDaysFromNowIso(),
       items: [{ description: 'Honorarios', quantity: 1, unitPrice: 0, ivaRateId: 3 }],
     },
   })
@@ -178,6 +204,9 @@ export function InvoiceForm() {
       monId: 'PES',
       monCotiz: 1,
       iva: totals.ivaBreakdown,
+      fchServDesde: data.fchServDesde.replace(/-/g, ''),
+      fchServHasta: data.fchServHasta.replace(/-/g, ''),
+      fchVtoPago: data.fchVtoPago.replace(/-/g, ''),
       items: data.items.map((i) => ({
         description: i.description,
         quantity: i.quantity,
@@ -252,6 +281,24 @@ export function InvoiceForm() {
               {receptorName && (
                 <p className="text-sm text-muted-foreground">{receptorName}</p>
               )}
+            </div>
+            <Separator />
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-1">
+                <Label>Período desde</Label>
+                <Input type="date" {...register('fchServDesde')} />
+                {errors.fchServDesde && <p className="text-sm text-destructive">{errors.fchServDesde.message}</p>}
+              </div>
+              <div className="space-y-1">
+                <Label>Período hasta</Label>
+                <Input type="date" {...register('fchServHasta')} />
+                {errors.fchServHasta && <p className="text-sm text-destructive">{errors.fchServHasta.message}</p>}
+              </div>
+              <div className="space-y-1">
+                <Label>Vto. pago</Label>
+                <Input type="date" {...register('fchVtoPago')} />
+                {errors.fchVtoPago && <p className="text-sm text-destructive">{errors.fchVtoPago.message}</p>}
+              </div>
             </div>
           </CardContent>
           <CardFooter>
