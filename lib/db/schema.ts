@@ -18,6 +18,8 @@ export const invoices = pgTable('invoices', {
   receptorCuit: varchar('receptor_cuit', { length: 11 }),
   receptorName: varchar('receptor_name', { length: 255 }),
   arcaEnv: varchar('arca_env', { length: 10 }).notNull().default('sandbox'),
+  creditNoteId: uuid('credit_note_id'),
+  originalInvoiceId: uuid('original_invoice_id'),
   pdfUrl: text('pdf_url'),
   rawRequest: jsonb('raw_request').notNull(),
   rawResponse: jsonb('raw_response').notNull(),

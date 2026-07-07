@@ -19,15 +19,15 @@ async function fetchInvoices(page: number): Promise<{ data: Invoice[]; page: num
 }
 
 const INVOICE_TYPE_LABELS: Record<number, string> = {
-  1: 'A', 2: 'A NdC', 3: 'A NdD',
-  6: 'B', 7: 'B NdC', 8: 'B NdD',
-  11: 'C', 12: 'C NdC', 13: 'C NdD',
+  1: 'A', 2: 'A NdD', 3: 'A NdC',
+  6: 'B', 7: 'B NdD', 8: 'B NdC',
+  11: 'C', 12: 'C NdD', 13: 'C NdC',
 }
 
 const SYNC_TYPES = [
-  { tipoCbte: 1, puntoVenta: 1 },
-  { tipoCbte: 6, puntoVenta: 1 },
-  { tipoCbte: 11, puntoVenta: 1 },
+  { tipoCbte: 1, puntoVenta: 2 },
+  { tipoCbte: 6, puntoVenta: 2 },
+  { tipoCbte: 11, puntoVenta: 2 },
 ]
 
 export function InvoiceList({ page = 1 }: { page?: number }) {

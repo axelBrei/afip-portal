@@ -30,7 +30,7 @@ services:
     environment:
       - DATABASE_URL=postgres://${PG_USER}:${PG_PASSWORD}@${PG_HOST}:${PG_PORT}/${PG_DB}
       - HOSTNAME=0.0.0.0
-      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+      - PUPPETEER_EXECUTABLE_PATH=/usr/local/bin/chromium-docker
     depends_on:
       postgres:
         condition: service_healthy

@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
 
   const { searchParams } = new URL(request.url)
   const tipoCbte = parseInt(searchParams.get('tipoCbte') ?? '11', 10)
-  const puntoVenta = parseInt(searchParams.get('puntoVenta') ?? '1', 10)
+  const puntoVenta = parseInt(searchParams.get('puntoVenta') ?? '2', 10)
 
   const arca = arcaService.getClient()
 

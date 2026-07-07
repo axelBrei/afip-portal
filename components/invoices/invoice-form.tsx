@@ -14,7 +14,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { Trash2, Plus, Download } from 'lucide-react'
+import { Trash2, Plus, Download, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const IVA_RATES = [
@@ -32,8 +32,8 @@ const CBTE_TYPES = [
 
 const lineItemSchema = z.object({
   description: z.string().min(1, 'Requerido'),
-  quantity: z.coerce.number().positive('Debe ser > 0'),
-  unitPrice: z.coerce.number().positive('Debe ser > 0'),
+  quantity: z.coerce.number().positive('> 0'),
+  unitPrice: z.coerce.number().positive('> 0'),
   ivaRateId: z.coerce.number(),
 })
 
@@ -113,6 +113,14 @@ function calcTotals(items: FormData['items']) {
   }
 }
 
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-4">
+      {children}
+    </p>
+  )
+}
+
 export function InvoiceForm() {
   const [receptorName, setReceptorName] = useState<string | null>(null)
   const [lookingUp, setLookingUp] = useState(false)
@@ -126,7 +134,7 @@ export function InvoiceForm() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       tipoCbte: 11,
-      puntoVenta: 1,
+      puntoVenta: 2,
       receptorCuit: '30715446142',
       fchServDesde: firstDayOfMonthIso(),
       fchServHasta: todayIso(),
@@ -210,13 +218,19 @@ export function InvoiceForm() {
 
   if (createdInvoice) {
     return (
-      <Card className="max-w-lg">
-        <CardContent className="pt-6 space-y-3">
-          <p className="text-sm text-muted-foreground">Factura autorizada</p>
-          <p className="font-mono text-lg font-semibold">{createdInvoice.cae}</p>
-          <p className="text-sm text-muted-foreground">Vence {createdInvoice.caeFchVto}</p>
+      <Card className="max-w-md border-border">
+        <CardContent className="pt-8 pb-6 px-8 space-y-4">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
+            <p className="font-medium">Factura autorizada</p>
+          </div>
+          <div className="bg-muted rounded-lg px-4 py-3 space-y-1">
+            <p className="text-xs text-muted-foreground">CAE</p>
+            <p className="font-mono text-sm font-medium">{createdInvoice.cae}</p>
+            <p className="text-xs text-muted-foreground">Vence {createdInvoice.caeFchVto}</p>
+          </div>
         </CardContent>
-        <CardFooter className="gap-2">
+        <CardFooter className="px-8 pb-8 gap-3">
           {createdInvoice.pdfUrl && (
             <a
               href={`/api/v1/invoices/${createdInvoice.id}/pdf`}
@@ -237,143 +251,176 @@ export function InvoiceForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-w-2xl">
-      {/* Comprobante */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label>Tipo de comprobante</Label>
-          <Select
-            value={watchedTipoCbte?.toString() ?? '11'}
-            onValueChange={(v) => v && setValue('tipoCbte', parseInt(v, 10))}
-          >
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {CBTE_TYPES.map((t) => (
-                <SelectItem key={t.id} value={t.id.toString()}>{t.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1.5">
-          <Label>Punto de venta</Label>
-          <Input type="number" {...register('puntoVenta')} />
-          {errors.puntoVenta && <p className="text-xs text-destructive">{errors.puntoVenta.message}</p>}
-        </div>
-      </div>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-w-2xl">
 
-      {/* Receptor */}
-      <div className="space-y-1.5">
-        <Label>CUIT receptor <span className="text-muted-foreground font-normal">(opcional)</span></Label>
-        <div className="flex gap-2">
-          <Input {...register('receptorCuit')} placeholder="20111111112" maxLength={11} />
-          <Button type="button" variant="outline" onClick={lookupCuit} disabled={lookingUp}>
-            {lookingUp ? 'Buscando...' : 'Buscar'}
-          </Button>
-        </div>
-        {receptorName && <p className="text-sm text-muted-foreground">{receptorName}</p>}
-      </div>
+      {/* Comprobante + Receptor */}
+      <Card className="border-border">
+        <CardContent className="px-6 pt-6 pb-6 space-y-5">
+          <SectionLabel>Comprobante</SectionLabel>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-sm text-muted-foreground">Tipo</Label>
+              <Select
+                value={watchedTipoCbte?.toString() ?? '11'}
+                onValueChange={(v) => v && setValue('tipoCbte', parseInt(v, 10))}
+              >
+                <SelectTrigger>
+                  <SelectValue>
+                    {CBTE_TYPES.find((t) => t.id === watchedTipoCbte)?.label ?? 'Seleccionar'}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {CBTE_TYPES.map((t) => (
+                    <SelectItem key={t.id} value={t.id.toString()}>{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm text-muted-foreground">Punto de venta</Label>
+              <Input type="number" {...register('puntoVenta')} />
+              {errors.puntoVenta && <p className="text-xs text-destructive">{errors.puntoVenta.message}</p>}
+            </div>
+          </div>
+
+          <Separator />
+          <SectionLabel>Receptor</SectionLabel>
+
+          <div className="space-y-2">
+            <Label className="text-sm text-muted-foreground">
+              CUIT <span className="font-normal">(opcional)</span>
+            </Label>
+            <div className="flex gap-2">
+              <Input {...register('receptorCuit')} placeholder="20111111112" maxLength={11} />
+              <Button type="button" variant="outline" size="sm" onClick={lookupCuit} disabled={lookingUp} className="shrink-0 px-4">
+                {lookingUp ? 'Buscando...' : 'Buscar'}
+              </Button>
+            </div>
+            {receptorName && (
+              <p className="text-sm font-medium text-foreground">{receptorName}</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Período */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="space-y-1.5">
-          <Label>Período desde</Label>
-          <Input type="date" {...register('fchServDesde')} />
-          {errors.fchServDesde && <p className="text-xs text-destructive">{errors.fchServDesde.message}</p>}
-        </div>
-        <div className="space-y-1.5">
-          <Label>Período hasta</Label>
-          <Input type="date" {...register('fchServHasta')} />
-          {errors.fchServHasta && <p className="text-xs text-destructive">{errors.fchServHasta.message}</p>}
-        </div>
-        <div className="space-y-1.5">
-          <Label>Vto. pago</Label>
-          <Input type="date" {...register('fchVtoPago')} />
-          {errors.fchVtoPago && <p className="text-xs text-destructive">{errors.fchVtoPago.message}</p>}
-        </div>
-      </div>
-
-      <Separator />
+      <Card className="border-border">
+        <CardContent className="px-6 pt-6 pb-6">
+          <SectionLabel>Período del servicio</SectionLabel>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-sm text-muted-foreground">Desde</Label>
+              <Input type="date" {...register('fchServDesde')} />
+              {errors.fchServDesde && <p className="text-xs text-destructive">{errors.fchServDesde.message}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm text-muted-foreground">Hasta</Label>
+              <Input type="date" {...register('fchServHasta')} />
+              {errors.fchServHasta && <p className="text-xs text-destructive">{errors.fchServHasta.message}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm text-muted-foreground">Vto. pago</Label>
+              <Input type="date" {...register('fchVtoPago')} />
+              {errors.fchVtoPago && <p className="text-xs text-destructive">{errors.fchVtoPago.message}</p>}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Ítems */}
-      <div className="space-y-2">
-        <div className="grid grid-cols-12 gap-2 text-xs text-muted-foreground px-1">
-          <span className="col-span-5">Descripción</span>
-          <span className="col-span-2">Cantidad</span>
-          <span className="col-span-2">Precio unit.</span>
-          <span className="col-span-2">IVA</span>
-        </div>
-        {fields.map((field, idx) => {
-          const ivaRateId = watch(`items.${idx}.ivaRateId`)
-          return (
-            <div key={field.id} className="grid grid-cols-12 gap-2 items-center">
-              <div className="col-span-5">
-                <Input {...register(`items.${idx}.description`)} placeholder="Descripción" />
-              </div>
-              <div className="col-span-2">
-                <Input type="number" step="0.01" {...register(`items.${idx}.quantity`)} />
-              </div>
-              <div className="col-span-2">
-                <Input type="number" step="0.01" {...register(`items.${idx}.unitPrice`)} />
-              </div>
-              <div className="col-span-2">
-                <Select
-                  value={String(ivaRateId ?? 3)}
-                  onValueChange={(v) => v && setValue(`items.${idx}.ivaRateId`, parseInt(v, 10))}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {IVA_RATES.map((r) => (
-                      <SelectItem key={r.id} value={r.id.toString()}>{r.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="col-span-1 flex justify-center">
-                {fields.length > 1 && (
-                  <Button type="button" variant="ghost" size="icon" onClick={() => remove(idx)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
+      <Card className="border-border">
+        <CardContent className="px-6 pt-6 pb-6 space-y-3">
+          <SectionLabel>Ítems</SectionLabel>
+
+          <div className="grid grid-cols-12 gap-2 px-1">
+            <span className="col-span-5 text-xs text-muted-foreground">Descripción</span>
+            <span className="col-span-2 text-xs text-muted-foreground">Cantidad</span>
+            <span className="col-span-2 text-xs text-muted-foreground">Precio unit.</span>
+            <span className="col-span-2 text-xs text-muted-foreground">IVA</span>
+          </div>
+
+          <div className="space-y-2">
+            {fields.map((field, idx) => {
+              const ivaRateId = watch(`items.${idx}.ivaRateId`)
+              return (
+                <div key={field.id} className="grid grid-cols-12 gap-2 items-center">
+                  <div className="col-span-5">
+                    <Input {...register(`items.${idx}.description`)} placeholder="Descripción" />
+                  </div>
+                  <div className="col-span-2">
+                    <Input type="number" step="0.01" {...register(`items.${idx}.quantity`)} />
+                  </div>
+                  <div className="col-span-2">
+                    <Input type="number" step="0.01" {...register(`items.${idx}.unitPrice`)} />
+                  </div>
+                  <div className="col-span-2">
+                    <Select
+                      value={String(ivaRateId ?? 3)}
+                      onValueChange={(v) => v && setValue(`items.${idx}.ivaRateId`, parseInt(v, 10))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue>
+                          {IVA_RATES.find((r) => r.id === ivaRateId)?.label ?? '0%'}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {IVA_RATES.map((r) => (
+                          <SelectItem key={r.id} value={r.id.toString()}>{r.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-1 flex justify-center">
+                    {fields.length > 1 && (
+                      <Button type="button" variant="ghost" size="icon" onClick={() => remove(idx)}>
+                        <Trash2 className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {errors.items && <p className="text-xs text-destructive">{errors.items.message}</p>}
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground -ml-1"
+            onClick={() => append({ description: '', quantity: 1, unitPrice: 0, ivaRateId: 3 })}
+          >
+            <Plus className="h-4 w-4 mr-1.5" />
+            Agregar ítem
+          </Button>
+
+          <Separator className="my-2" />
+
+          <div className="space-y-2 ml-auto max-w-[260px]">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Neto gravado</span>
+              <span className="font-mono">${totals.impNeto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
             </div>
-          )
-        })}
-        {errors.items && <p className="text-xs text-destructive">{errors.items.message}</p>}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground"
-          onClick={() => append({ description: '', quantity: 1, unitPrice: 0, ivaRateId: 3 })}
-        >
-          <Plus className="h-4 w-4 mr-1" />
-          Agregar ítem
-        </Button>
-      </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">IVA</span>
+              <span className="font-mono">${totals.impIva.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+            </div>
+            <Separator />
+            <div className="flex justify-between text-sm font-semibold pt-0.5">
+              <span>Total</span>
+              <span className="font-mono">${totals.impTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-      <Separator />
+      {submitError && (
+        <p className="text-sm text-destructive px-1">{submitError}</p>
+      )}
 
-      {/* Totales */}
-      <div className="space-y-1 text-sm max-w-xs ml-auto">
-        <div className="flex justify-between text-muted-foreground">
-          <span>Neto gravado</span>
-          <span className="font-mono">${totals.impNeto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-        </div>
-        <div className="flex justify-between text-muted-foreground">
-          <span>IVA</span>
-          <span className="font-mono">${totals.impIva.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-        </div>
-        <Separator />
-        <div className="flex justify-between font-semibold">
-          <span>Total</span>
-          <span className="font-mono">${totals.impTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-        </div>
-      </div>
-
-      {submitError && <p className="text-sm text-destructive">{submitError}</p>}
-
-      <div className="flex gap-2">
-        <Button type="submit" disabled={createInvoice.isPending}>
+      <div className="flex gap-3 pt-1">
+        <Button type="submit" disabled={createInvoice.isPending} className="px-8">
           {createInvoice.isPending ? 'Autorizando...' : 'Autorizar factura'}
         </Button>
         <Link href="/invoices" className={cn(buttonVariants({ variant: 'outline' }))}>

@@ -23,9 +23,17 @@ FROM base AS runner
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PUPPETEER_SKIP_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont
+
+# Wrapper script: adds flags required to run Chromium headlessly inside Docker
+# --no-sandbox: required when running as non-root
+# --disable-dev-shm-usage: avoids crashes from Docker's limited /dev/shm (default 64 MB)
+RUN printf '#!/bin/sh\nexec /usr/bin/chromium-browser --no-sandbox --disable-dev-shm-usage "$@"\n' \
+    > /usr/local/bin/chromium-docker \
+    && chmod +x /usr/local/bin/chromium-docker
+
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/local/bin/chromium-docker
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -38,9 +46,6 @@ COPY --chown=nextjs:nodejs --from=builder /app/drizzle.config.ts ./
 COPY --chown=nextjs:nodejs --from=builder /app/lib/db/schema.ts ./lib/db/schema.ts
 
 RUN mkdir -p /data/certs && chown nextjs:nodejs /data/certs
-
-# Tell puppeteer where to find the system chromium (cosmiconfig reads this before env vars)
-RUN echo 'module.exports = { executablePath: "/usr/bin/chromium-browser" };' > /app/.puppeteerrc.cjs
 
 USER nextjs
 EXPOSE 3000
