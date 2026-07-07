@@ -93,6 +93,9 @@ export async function POST(request: NextRequest) {
   const arca = arcaService.getClient()
   const today = toArcaDate(new Date())
 
+  // Factura C types (11=C, 12=ND C, 13=NC C): no Iva array, ImpNeto = total
+  const isTipoC = data.tipoCbte >= 11 && data.tipoCbte <= 13
+
   const voucherPayload = {
     CantReg: 1,
     PtoVta: data.puntoVenta,
@@ -103,14 +106,14 @@ export async function POST(request: NextRequest) {
     CbteFch: today,
     ImpTotal: data.impTotal,
     ImpTotConc: 0,
-    ImpNeto: data.impNeto,
-    ImpIVA: data.impIva,
+    ImpNeto: isTipoC ? data.impTotal : data.impNeto,
+    ImpIVA: isTipoC ? 0 : data.impIva,
     ImpTrib: 0,
     ImpOpEx: 0,
     MonId: data.monId,
     MonCotiz: data.monCotiz,
     CondicionIVAReceptorId: data.docTipo === 80 ? 1 : 5,
-    Iva: data.iva,
+    ...(!isTipoC && { Iva: data.iva }),
     ...(data.concepto !== 1 && {
       FchServDesde: data.fchServDesde ?? today,
       FchServHasta: data.fchServHasta ?? today,
