@@ -180,44 +180,40 @@ export function InvoiceDetail({ id }: { id: string }) {
 
         {/* Header */}
         <div className="px-6 pt-6 pb-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <Eyebrow>{tipoLabel}</Eyebrow>
-              <h1 className="mt-1.5 text-[2rem] font-semibold tracking-tight text-foreground font-mono leading-none">
-                {voucherRef(invoice)}
-              </h1>
-              <p className="mt-1.5 text-sm text-muted-foreground">{invoiceDate}</p>
-            </div>
-            <div className="flex items-center gap-2 shrink-0 pt-0.5">
-              {invoice.pdfUrl ? (
-                <a
-                  href={`/api/v1/invoices/${invoice.id}/pdf`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
-                >
-                  <Download className="h-4 w-4 mr-1.5" />
-                  PDF
-                </a>
-              ) : (
-                <Button size="sm" variant="outline" onClick={handleGeneratePdf} disabled={generating}>
-                  <FileText className="h-4 w-4 mr-1.5" />
-                  {generating ? 'Generando…' : 'Generar PDF'}
-                </Button>
-              )}
-              {isFacC && !creditNoteId && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleCreditNote}
-                  disabled={crediting}
-                  className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
-                >
-                  <RotateCcw className="h-4 w-4 mr-1.5" />
-                  {crediting ? 'Anulando…' : 'Crear NC'}
-                </Button>
-              )}
-            </div>
+          <Eyebrow>{tipoLabel}</Eyebrow>
+          <h1 className="mt-1.5 text-xl sm:text-[2rem] font-semibold tracking-tight text-foreground font-mono leading-none">
+            {voucherRef(invoice)}
+          </h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">{invoiceDate}</p>
+          <div className="flex items-center gap-2 mt-4">
+            {invoice.pdfUrl ? (
+              <a
+                href={`/api/v1/invoices/${invoice.id}/pdf`}
+                target="_blank"
+                rel="noreferrer"
+                className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
+              >
+                <Download className="h-4 w-4 mr-1.5" />
+                PDF
+              </a>
+            ) : (
+              <Button size="sm" variant="outline" onClick={handleGeneratePdf} disabled={generating}>
+                <FileText className="h-4 w-4 mr-1.5" />
+                {generating ? 'Generando…' : 'Generar PDF'}
+              </Button>
+            )}
+            {isFacC && !creditNoteId && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleCreditNote}
+                disabled={crediting}
+                className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+              >
+                <RotateCcw className="h-4 w-4 mr-1.5" />
+                {crediting ? 'Anulando…' : 'Crear NC'}
+              </Button>
+            )}
           </div>
           {(genError || creditError) && (
             <p className="mt-3 text-sm text-destructive">{genError ?? creditError}</p>

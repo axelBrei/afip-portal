@@ -85,6 +85,7 @@ export function InvoiceList({ page = 1 }: { page?: number }) {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="sm:hidden"></TableHead>
               <TableHead>Tipo</TableHead>
               <TableHead>Pto. Venta</TableHead>
               <TableHead>Nro.</TableHead>
@@ -92,12 +93,20 @@ export function InvoiceList({ page = 1 }: { page?: number }) {
               <TableHead className="text-right">Total</TableHead>
               <TableHead>CAE vence</TableHead>
               <TableHead>Fecha</TableHead>
-              <TableHead></TableHead>
+              <TableHead className="hidden sm:table-cell"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {data.data.map((invoice) => (
               <TableRow key={invoice.id}>
+                <TableCell className="sm:hidden">
+                  <Link
+                    href={`/invoices/${invoice.id}`}
+                    className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}
+                  >
+                    Ver
+                  </Link>
+                </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1.5">
                     <Badge variant="outline">
@@ -120,7 +129,7 @@ export function InvoiceList({ page = 1 }: { page?: number }) {
                 </TableCell>
                 <TableCell>{invoice.caeFchVto}</TableCell>
                 <TableCell>{new Date(invoice.createdAt).toLocaleDateString('es-AR')}</TableCell>
-                <TableCell>
+                <TableCell className="hidden sm:table-cell">
                   <Link
                     href={`/invoices/${invoice.id}`}
                     className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}
