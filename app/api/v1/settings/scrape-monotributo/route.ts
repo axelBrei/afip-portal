@@ -15,7 +15,8 @@ function parseArgentineNumber(s: string): number {
 
 function extractCells(rowHtml: string): string[] {
   const cells: string[] = []
-  const tdRe = /<td[^>]*>([\s\S]*?)<\/td>/gi
+  // Match both <th> and <td> — AFIP uses <th scope="row"> for the category letter
+  const tdRe = /<(?:td|th)[^>]*>([\s\S]*?)<\/(?:td|th)>/gi
   let m
   while ((m = tdRe.exec(rowHtml)) !== null) {
     const text = m[1]
@@ -48,7 +49,8 @@ async function scrape(url: string) {
   const allTrMatches = html.match(/<tr[^>]*>/gi) ?? []
   console.log(`[scrape-monotributo] total <tr> tags found: ${allTrMatches.length}`)
 
-  const categories: { categ: string; ingresosBrutos: number; cuotaMensual: number }[] = []
+  // Use a Map to deduplicate — AFIP embeds multiple period tables; first occurrence = current period
+  const categoriesMap = new Map<string, { categ: string; ingresosBrutos: number; cuotaMensual: number }>()
   const trRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi
   let trMatch
   let rowsScanned = 0
@@ -59,32 +61,29 @@ async function scrape(url: string) {
 
     if (cells.length === 0) continue
 
-    // Log rows whose first cell looks like a category letter (A-K) to catch near-misses
     if (/^[A-Z]$/.test(cells[0])) {
-      console.log(`[scrape-monotributo] candidate row — first cell: "${cells[0]}", cols: ${cells.length}, values: ${JSON.stringify(cells.slice(0, 4))}...`)
+      console.log(`[scrape-monotributo] candidate row — first cell: "${cells[0]}", cols: ${cells.length}, first4: ${JSON.stringify(cells.slice(0, 4))}`)
     }
 
-    // Data rows start with a single letter A–K and have at least 11 columns
+    // Data rows: first cell is a single letter A–K, at least 11 total cells
     if (cells.length >= 11 && /^[A-K]$/.test(cells[0])) {
       const ingresosBrutos = parseArgentineNumber(cells[1])
-      // Second-to-last column is "Total – Locaciones y prestaciones de servicios"
       const cuotaMensual = parseArgentineNumber(cells[cells.length - 2])
 
-      console.log(`[scrape-monotributo] matched cat ${cells[0]}: ingresosBrutos=${ingresosBrutos}, cuotaMensual=${cuotaMensual}, allCells=${JSON.stringify(cells)}`)
+      console.log(`[scrape-monotributo] matched cat ${cells[0]}: ingresosBrutos=${ingresosBrutos}, cuotaMensual=${cuotaMensual}`)
 
-      if (ingresosBrutos > 0) {
-        categories.push({ categ: cells[0], ingresosBrutos, cuotaMensual })
-      } else {
-        console.warn(`[scrape-monotributo] skipped cat ${cells[0]} — ingresosBrutos parsed as 0 from "${cells[1]}"`)
+      // Keep first occurrence only (current period)
+      if (ingresosBrutos > 0 && !categoriesMap.has(cells[0])) {
+        categoriesMap.set(cells[0], { categ: cells[0], ingresosBrutos, cuotaMensual })
       }
     }
   }
 
-  console.log(`[scrape-monotributo] rows scanned: ${rowsScanned}, categories found: ${categories.length}`)
+  const categories = Array.from(categoriesMap.values()).sort((a, b) => a.categ.localeCompare(b.categ))
+  console.log(`[scrape-monotributo] rows scanned: ${rowsScanned}, unique categories: ${categories.length}`)
 
   if (categories.length === 0) {
-    // Dump a snippet of the HTML to help diagnose
-    console.error(`[scrape-monotributo] no categories found. HTML snippet (first 2000 chars):\n${html.slice(0, 2000)}`)
+    console.error(`[scrape-monotributo] no categories found. HTML snippet:\n${html.slice(0, 3000)}`)
     throw new Error('No se encontraron categorías en la página')
   }
 
