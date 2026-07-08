@@ -3,6 +3,9 @@ WORKDIR /app
 
 FROM base AS deps
 COPY package.json package-lock.json ./
+# Skip Puppeteer's bundled Chrome download — we use the system Chromium in the runner stage.
+# Without this, Puppeteer downloads a glibc-linked Chrome that silently hangs on Alpine (musl).
+ENV PUPPETEER_SKIP_DOWNLOAD=true
 RUN npm ci --only=production && cp -r node_modules /prod_modules
 RUN npm ci
 
@@ -44,6 +47,8 @@ COPY --chown=nextjs:nodejs --from=builder /app/node_modules ./node_modules
 COPY --chown=nextjs:nodejs --from=builder /app/.next/static ./.next/static
 COPY --chown=nextjs:nodejs --from=builder /app/drizzle.config.ts ./
 COPY --chown=nextjs:nodejs --from=builder /app/lib/db/schema.ts ./lib/db/schema.ts
+# Puppeteer config: read by puppeteer.launch() to bind the system Chromium executable
+COPY --chown=nextjs:nodejs --from=builder /app/puppeteer.config.cjs ./
 
 RUN mkdir -p /data/certs && chown nextjs:nodejs /data/certs
 
