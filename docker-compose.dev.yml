@@ -43,7 +43,24 @@ services:
       HOSTNAME: 0.0.0.0
       NODE_ENV: development
       DATABASE_URL: postgres://user:pass@postgres:5432/dbname
+      PUPPETEER_EXECUTABLE_PATH: /usr/local/bin/chromium-docker
     command: sh -c "./node_modules/.bin/drizzle-kit push && npm run dev"
+
+  drizzle-studio:
+    build:
+      context: .
+      target: dev
+    container_name: afip-drizzle-studio-dev
+    command: ./node_modules/.bin/drizzle-kit studio --host 0.0.0.0
+    ports:
+      - "4983:4983"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://user:pass@postgres:5432/dbname
 
 volumes:
   certs:

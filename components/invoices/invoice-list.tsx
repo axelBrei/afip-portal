@@ -99,9 +99,16 @@ export function InvoiceList({ page = 1 }: { page?: number }) {
             {data.data.map((invoice) => (
               <TableRow key={invoice.id}>
                 <TableCell>
-                  <Badge variant="outline">
-                    Fac. {INVOICE_TYPE_LABELS[invoice.tipoCbte] ?? invoice.tipoCbte}
-                  </Badge>
+                  <div className="flex items-center gap-1.5">
+                    <Badge variant="outline">
+                      Fac. {INVOICE_TYPE_LABELS[invoice.tipoCbte] ?? invoice.tipoCbte}
+                    </Badge>
+                    {invoice.tipoCbte === 11 && invoice.creditNoteId && (
+                      <Badge variant="outline" className="text-destructive border-destructive/40">
+                        Anulada
+                      </Badge>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell>{invoice.puntoVenta.toString().padStart(5, '0')}</TableCell>
                 <TableCell>{invoice.nroCbte.toString().padStart(8, '0')}</TableCell>

@@ -1,8 +1,12 @@
 'use client'
 
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import type { PersonaServiceA5PortTypes } from '@arcasdk/core/lib/application/dto/register/persona-service-inscription-proof.types'
 
 // SOAP responses come back with PascalCase keys; normalize to camelCase so we
@@ -78,16 +82,37 @@ async function fetchPadron(cuit: string) {
   const res = await fetch(`/api/v1/padron/${cuit}`)
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
-    throw new Error(err.error ?? 'Error al consultar el padrón')
+    const error = new Error(err.error ?? 'Error al consultar el padrón') as Error & { status: number }
+    error.status = res.status
+    throw error
   }
   return res.json() as Promise<{ data: unknown; cached: boolean }>
 }
 
 export function PadronDetail({ cuit }: { cuit: string }) {
-  const { data: response } = useSuspenseQuery({
+  const router = useRouter()
+  const { data: response, isLoading, error } = useQuery({
     queryKey: ['padron', cuit],
     queryFn: () => fetchPadron(cuit),
+    retry: false,
   })
+
+  useEffect(() => {
+    if (!error) return
+    const status = (error as Error & { status?: number }).status
+    if (status === 404) {
+      toast.error('CUIT no encontrado en el padrón')
+    } else {
+      toast.error(error.message)
+    }
+    router.replace('/padron')
+  }, [error, router])
+
+  if (isLoading) {
+    return <Skeleton className="h-64 max-w-2xl mx-auto" />
+  }
+
+  if (!response) return null
 
   const raw = normalizeKeys(response.data) as PersonaServiceA5PortTypes.IpersonaReturn
   const dg = raw?.datosGenerales

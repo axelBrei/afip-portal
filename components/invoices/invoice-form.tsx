@@ -5,7 +5,7 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import Link from 'next/link'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -127,6 +127,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 type DocumentType = { id: number; desc: string }
 
 export function InvoiceForm() {
+  const queryClient = useQueryClient()
   const [receptorName, setReceptorName] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [createdInvoice, setCreatedInvoice] = useState<any>(null)
@@ -146,7 +147,7 @@ export function InvoiceForm() {
     defaultValues: {
       tipoCbte: 11,
       puntoVenta: 2,
-      docTipo: 99,
+      docTipo: 80,
       docNro: undefined,
       receptorCuit: '',
       fchServDesde: firstDayOfMonthIso(),
@@ -175,7 +176,10 @@ export function InvoiceForm() {
       if (!res.ok) throw new Error(await res.text())
       return res.json()
     },
-    onSuccess: (invoice) => setCreatedInvoice(invoice),
+    onSuccess: (invoice) => {
+      setCreatedInvoice(invoice)
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+    },
     onError: (err) => setSubmitError(err instanceof Error ? err.message : 'Error al crear factura'),
   })
 
@@ -264,7 +268,7 @@ export function InvoiceForm() {
                 value={watchedTipoCbte?.toString() ?? '11'}
                 onValueChange={(v) => v && setValue('tipoCbte', parseInt(v, 10))}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue>
                     {CBTE_TYPES.find((t) => t.id === watchedTipoCbte)?.label ?? 'Seleccionar'}
                   </SelectValue>
@@ -286,75 +290,74 @@ export function InvoiceForm() {
           <Separator />
           <SectionLabel>Receptor</SectionLabel>
 
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label className="text-sm text-muted-foreground">Tipo de documento</Label>
-              <Select
-                value={watchedDocTipo?.toString() ?? '99'}
-                onValueChange={(v) => {
-                  if (!v) return
-                  setValue('docTipo', parseInt(v, 10))
-                  setValue('receptorCuit', '')
-                  setValue('docNro', undefined)
-                  setReceptorName(null)
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue>
-                    {docTypes.find((d) => d.id === watchedDocTipo)?.desc ?? 'Sin identificar'}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {docTypes.length > 0
-                    ? docTypes.map((d) => (
-                        <SelectItem key={d.id} value={d.id.toString()}>{d.desc}</SelectItem>
-                      ))
-                    : (
-                        <>
-                          <SelectItem value="80">CUIT</SelectItem>
-                          <SelectItem value="96">DNI</SelectItem>
-                          <SelectItem value="99">Sin identificar</SelectItem>
-                        </>
-                      )}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {isCuit && (
-              <div className="space-y-1.5">
-                <Label className="text-sm text-muted-foreground">
-                  Empresa o persona
-                </Label>
-                <ReceptorPicker
-                  onSelect={(cuit, name, tipoPersona) => {
-                    setValue('receptorCuit', cuit)
-                    setReceptorName(name)
-                    if (tipoPersona === 'JURIDICA') {
-                      setValue('docTipo', 80)
-                    } else if (tipoPersona === 'FISICA') {
-                      setValue('docTipo', 86)
-                      setValue('docNro', parseInt(cuit.replace(/\D/g, ''), 10))
-                    }
-                  }}
-                  onClear={() => {
+          <div className="sm:flex sm:gap-4">
+              <div className="space-y-1.5 sm:flex-none sm:w-40">
+                <Label className="text-sm text-muted-foreground">Tipo de documento</Label>
+                <Select
+                  value={watchedDocTipo?.toString() ?? '99'}
+                  onValueChange={(v) => {
+                    if (!v) return
+                    setValue('docTipo', parseInt(v, 10))
                     setValue('receptorCuit', '')
+                    setValue('docNro', undefined)
                     setReceptorName(null)
                   }}
-                />
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue>
+                      {docTypes.find((d) => d.id === watchedDocTipo)?.desc ?? 'Sin identificar'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {docTypes.length > 0
+                      ? docTypes.map((d) => (
+                          <SelectItem key={d.id} value={d.id.toString()}>{d.desc}</SelectItem>
+                        ))
+                      : (
+                          <>
+                            <SelectItem value="80">CUIT</SelectItem>
+                            <SelectItem value="96">DNI</SelectItem>
+                            <SelectItem value="99">Sin identificar</SelectItem>
+                          </>
+                        )}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
 
-            {!isCuit && !isConsumidorFinal && (
-              <div className="space-y-1.5">
-                <Label className="text-sm text-muted-foreground">Número de documento</Label>
-                <Input
-                  type="number"
-                  placeholder="Ej: 12345678"
-                  {...register('docNro')}
-                />
-                {errors.docNro && <p className="text-xs text-destructive">{errors.docNro.message}</p>}
-              </div>
-            )}
+              {!isCuit && (
+                <div className="space-y-1.5 mt-4 sm:mt-0 sm:flex-1">
+                  <Label className="text-sm text-muted-foreground">Número de documento</Label>
+                  <Input
+                    type="number"
+                    placeholder="Ej: 12345678"
+                    {...register('docNro')}
+                  />
+                  {errors.docNro && <p className="text-xs text-destructive">{errors.docNro.message}</p>}
+                </div>
+              )}
+
+              {isCuit && (
+                <div className="space-y-1.5 mt-4 sm:mt-0 sm:flex-1">
+                  <Label className="text-sm text-muted-foreground">Empresa o persona</Label>
+                  <ReceptorPicker
+                    onSelect={(cuit, name, tipoPersona, tipoClave) => {
+                      setValue('receptorCuit', cuit)
+                      setReceptorName(name)
+                      if (tipoPersona === 'JURIDICA' || tipoClave === 'CUIT') {
+                        setValue('docTipo', 80)
+                        setValue('docNro', parseInt(cuit.replace(/\D/g, ''), 10))
+                      } else if (tipoPersona === 'FISICA') {
+                        setValue('docTipo', 86)
+                        setValue('docNro', parseInt(cuit.replace(/\D/g, ''), 10))
+                      }
+                    }}
+                    onClear={() => {
+                      setValue('receptorCuit', '')
+                      setReceptorName(null)
+                    }}
+                  />
+                </div>
+              )}
           </div>
         </CardContent>
       </Card>

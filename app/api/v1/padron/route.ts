@@ -24,6 +24,12 @@ function extractTipoPersona(data: unknown): string | null {
   return (dg?.tipoPersona as string) || null
 }
 
+function extractTipoClave(data: unknown): string | null {
+  const d = data as Record<string, unknown>
+  const dg = (d?.datosGenerales ?? d) as Record<string, unknown>
+  return (dg?.tipoClave as string) || null
+}
+
 export async function GET() {
   const env = arcaService.getActiveEnv()
   const rows = await db
@@ -37,6 +43,7 @@ export async function GET() {
       cuit: r.cuit,
       name: extractName(r.data),
       tipoPersona: extractTipoPersona(r.data),
+      tipoClave: extractTipoClave(r.data),
       fetchedAt: r.fetchedAt,
       expiresAt: r.expiresAt,
     })),

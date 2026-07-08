@@ -3,11 +3,29 @@ import { db } from '@/lib/db'
 import { arcaService } from '@/lib/arca/service'
 import { getEmisor } from '@/lib/arca/emisor'
 import { getInvoicesTable } from '@/lib/db/invoices-table'
+import { padronCache } from '@/lib/db/schema'
 import { uploadPdf } from '@/lib/r2/client'
 import { InvoicePdfGenerator } from '@arcasdk/pdf'
 import { z } from 'zod'
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
+
+const CONDICION_IVA_MAP: Record<number, string> = {
+  1: 'Responsable Inscripto',
+  2: 'Responsable no Inscripto',
+  3: 'IVA no Responsable',
+  4: 'IVA Sujeto Exento',
+  5: 'Consumidor Final',
+  6: 'Monotributista',
+  7: 'Sujeto no Categorizado',
+  8: 'Importador del Exterior',
+  9: 'Cliente del Exterior',
+  10: 'IVA Liberado - Ley Nº 19.640',
+  11: 'Responsable Inscripto - Agente de Percepción',
+  12: 'Pequeño Contribuyente Eventual',
+  13: 'Monotributista Social',
+  14: 'Pequeño Contribuyente Eventual Social',
+}
 
 console.log('[invoices/route] module loaded')
 
@@ -84,14 +102,39 @@ async function generateAndUploadPdf(opts: {
     const emisor = await getEmisor()
     console.log(`[PDF bg] getEmisor ${Date.now() - t0}ms`)
 
+    // Look up receptor domicilio from padron cache
+    let receptorDomicilio: string | undefined
+    const docNroStr = String(data.docNro)
+    if (docNroStr.length === 11) {
+      const env = arcaService.getActiveEnv()
+      const cached = await db
+        .select({ data: padronCache.data })
+        .from(padronCache)
+        .where(and(eq(padronCache.cuit, docNroStr), eq(padronCache.env, env)))
+        .limit(1)
+      if (cached[0]) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const dg = ((cached[0].data as any)?.datosGenerales ?? cached[0].data) as Record<string, unknown>
+        const domFiscal = dg?.domicilioFiscal as Record<string, unknown> | undefined
+        if (domFiscal) {
+          receptorDomicilio = [domFiscal.direccion, domFiscal.localidad, domFiscal.descripcionProvincia]
+            .filter(Boolean)
+            .join(', ') || undefined
+        }
+      }
+    }
+
+    const receptorCondicionIva = CONDICION_IVA_MAP[data.docTipo === 80 ? 1 : 5]
+
     const t1 = Date.now()
     const pdfGen = new InvoicePdfGenerator({ includeQr: true })
     const pdfBuffer = await pdfGen.generate({
       emisor,
       receptor: {
         razonSocial: data.receptorName ?? 'Consumidor Final',
-        condicionIva: data.docTipo === 80 ? 'Responsable Inscripto' : 'Consumidor Final',
-        documentoTipo: data.docTipo === 80 ? 'CUIT' : 'DNI',
+        domicilio: receptorDomicilio,
+        condicionIva: receptorCondicionIva,
+        documentoTipo: data.docTipo === 80 ? 'CUIT' : data.docTipo === 86 ? 'CUIL' : 'DNI',
         documentoNro: String(data.docNro),
       },
       cbteTipo: data.tipoCbte,

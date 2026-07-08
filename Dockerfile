@@ -16,9 +16,14 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 FROM base AS dev
+RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont
+RUN printf '#!/bin/sh\nexec /usr/bin/chromium-browser --no-sandbox --disable-dev-shm-usage "$@"\n' \
+    > /usr/local/bin/chromium-docker \
+    && chmod +x /usr/local/bin/chromium-docker
 COPY --from=deps /app/node_modules ./node_modules
 ENV NODE_ENV=development
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV PUPPETEER_SKIP_DOWNLOAD=true
 EXPOSE 3000
 CMD ["npm", "run", "dev"]
 

@@ -4,7 +4,7 @@ import { useSuspenseQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import Link from 'next/link'
 import { Button, buttonVariants } from '@/components/ui/button'
-import { Download, FileText, RotateCcw, CheckCircle2, ArrowLeft, ArrowRight } from 'lucide-react'
+import { Download, FileText, RotateCcw, CheckCircle2, ArrowLeft, ArrowRight, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Invoice } from '@/lib/db/schema'
 
@@ -29,6 +29,27 @@ function voucherRef(inv: Invoice) {
   return `${inv.puntoVenta.toString().padStart(5, '0')}-${inv.nroCbte.toString().padStart(8, '0')}`
 }
 
+function afipCheckerUrl(inv: Invoice) {
+  const fecha = new Date(inv.createdAt).toISOString().slice(0, 10)
+  const payload = {
+    ver:        1,
+    fecha,
+    cuit:       parseInt(inv.cuit, 10),
+    ptoVta:     inv.puntoVenta,
+    tipoCmp:    inv.tipoCbte,
+    nroCmp:     inv.nroCbte,
+    importe:    parseFloat(inv.amountTotal),
+    moneda:     'PES',
+    ctz:        1,
+    tipoDocRec: inv.receptorCuit ? 80 : 99,
+    nroDocRec:  inv.receptorCuit ? parseInt(inv.receptorCuit, 10) : 0,
+    tipoCodAut: 'E',
+    codAut:     parseInt(inv.cae, 10),
+  }
+  const p = btoa(JSON.stringify(payload))
+  return `https://servicioscf.afip.gob.ar/publico/comprobantes/cae.aspx?p=${p}`
+}
+
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
     <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
@@ -43,23 +64,23 @@ function RelatedBanner({
   href,
   icon,
   accent = false,
+  external = false,
 }: {
   label: string
   sublabel?: string
   href: string
   icon: React.ReactNode
   accent?: boolean
+  external?: boolean
 }) {
-  return (
-    <Link
-      href={href}
-      className={cn(
-        'flex items-center justify-between px-4 py-3 rounded-lg border bg-card transition-colors text-sm group',
-        accent
-          ? 'border-primary/40 hover:border-primary/60 hover:bg-accent'
-          : 'border-border hover:bg-accent'
-      )}
-    >
+  const className = cn(
+    'flex items-center justify-between px-4 py-3 rounded-lg border bg-card transition-colors text-sm group',
+    accent
+      ? 'border-primary/40 hover:border-primary/60 hover:bg-accent'
+      : 'border-border hover:bg-accent'
+  )
+  const inner = (
+    <>
       <div className="flex items-center gap-2.5">
         <span className={cn('shrink-0', accent ? 'text-primary' : 'text-muted-foreground')}>
           {icon}
@@ -69,9 +90,16 @@ function RelatedBanner({
           {sublabel && <span className="text-muted-foreground ml-2 text-xs">{sublabel}</span>}
         </div>
       </div>
-      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
-    </Link>
+      {external
+        ? <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
+        : <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
+      }
+    </>
   )
+  if (external) {
+    return <a href={href} target="_blank" rel="noreferrer" className={className}>{inner}</a>
+  }
+  return <Link href={href} className={className}>{inner}</Link>
 }
 
 export function InvoiceDetail({ id }: { id: string }) {
@@ -249,6 +277,14 @@ export function InvoiceDetail({ id }: { id: string }) {
 
         </div>
       </div>
+
+      {/* AFIP CAE checker */}
+      <RelatedBanner
+        label="Verificar comprobante en AFIP"
+        href={afipCheckerUrl(invoice)}
+        icon={<ExternalLink className="h-4 w-4" />}
+        external
+      />
 
       {/* Factura C → NC link */}
       {isFacC && creditNoteId && !freshCreditNote && (

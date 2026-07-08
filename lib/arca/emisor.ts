@@ -21,12 +21,30 @@ export async function getEmisor(): Promise<EmisorData> {
   const arca = arcaService.getClient()
   console.log(`[getEmisor] fetching from ws_sr_constancia_inscripcion cuit=${arcaCuit}`)
   const t0 = Date.now()
-  const taxpayer = await arca.registerInscriptionProofService.getTaxpayerDetails(
-    parseInt(arcaCuit, 10)
-  )
+  let taxpayer = null
+  try {
+    taxpayer = await arca.registerInscriptionProofService.getTaxpayerDetails(
+      parseInt(arcaCuit, 10)
+    )
+  } catch (err) {
+    // Sandbox may return SOAP faults not matched by isAfipNotFoundError — fall through to env var fallback
+    console.warn(`[getEmisor] getTaxpayerDetails threw for CUIT ${arcaCuit}:`, err)
+  }
   console.log(`[getEmisor] ws_sr_constancia_inscripcion ${Date.now() - t0}ms`)
 
-  if (!taxpayer) throw new Error(`Emisor CUIT ${arcaCuit} not found in ARCA registry`)
+  if (!taxpayer) {
+    // ARCA sandbox doesn't have all CUITs registered — fall back to env vars
+    console.warn(`[getEmisor] CUIT ${arcaCuit} not found in ARCA registry, falling back to env vars`)
+    cached = {
+      cuit: arcaCuit,
+      razonSocial: process.env.ARCA_RAZON_SOCIAL || '',
+      domicilioComercial: process.env.ARCA_DOMICILIO || '',
+      condicionIva: process.env.ARCA_CONDICION_IVA || 'Responsable Inscripto',
+      iibb: process.env.ARCA_IIBB ?? '',
+      fechaInicioActividades: process.env.ARCA_INICIO_ACTIVIDADES ?? '',
+    }
+    return cached
+  }
 
   // TaxpayerDetailsDto types a subset — runtime has the full SOAP IdatosGenerales
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
