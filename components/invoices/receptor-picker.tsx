@@ -5,10 +5,10 @@ import { useQuery } from '@tanstack/react-query'
 import { Input } from '@/components/ui/input'
 import { X, Loader2 } from 'lucide-react'
 
-type Entry = { cuit: string; name: string }
+type Entry = { cuit: string; name: string; tipoPersona?: string | null }
 
 interface Props {
-  onSelect: (cuit: string, name: string | null) => void
+  onSelect: (cuit: string, name: string | null, tipoPersona?: string | null) => void
   onClear: () => void
 }
 
@@ -21,6 +21,12 @@ function extractName(data: unknown): string {
     ((d?.persona as Record<string, unknown>)?.denominacion as string) ||
     ''
   )
+}
+
+function extractTipoPersona(data: unknown): string | null {
+  const d = data as Record<string, unknown>
+  const dg = (d?.datosGenerales ?? d) as Record<string, unknown>
+  return (dg?.tipoPersona as string) || null
 }
 
 export function ReceptorPicker({ onSelect, onClear }: Props) {
@@ -59,7 +65,7 @@ export function ReceptorPicker({ onSelect, onClear }: Props) {
       setSelected(found)
       setInput(found.name || found.cuit)
       setOpen(false)
-      cbRef.current.onSelect(found.cuit, found.name || null)
+      cbRef.current.onSelect(found.cuit, found.name || null, found.tipoPersona)
       return
     }
     attempted.current.add(digits)
@@ -69,11 +75,12 @@ export function ReceptorPicker({ onSelect, onClear }: Props) {
       .then((body) => {
         if (!body) return
         const name = extractName(body.data)
-        const entry: Entry = { cuit: digits, name }
+        const tipoPersona = extractTipoPersona(body.data)
+        const entry: Entry = { cuit: digits, name, tipoPersona }
         setSelected(entry)
         setInput(name || digits)
         setOpen(false)
-        cbRef.current.onSelect(digits, name || null)
+        cbRef.current.onSelect(digits, name || null, tipoPersona)
       })
       .finally(() => setFetching(false))
   }, [digits, entries, selected, data])
@@ -95,7 +102,7 @@ export function ReceptorPicker({ onSelect, onClear }: Props) {
     setSelected(entry)
     setInput(entry.name || entry.cuit)
     setOpen(false)
-    cbRef.current.onSelect(entry.cuit, entry.name || null)
+    cbRef.current.onSelect(entry.cuit, entry.name || null, entry.tipoPersona)
   }
 
   function handleClear() {

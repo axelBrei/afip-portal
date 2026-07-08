@@ -5,7 +5,7 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import Link from 'next/link'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -41,6 +41,8 @@ const lineItemSchema = z.object({
 const formSchema = z.object({
   tipoCbte: z.coerce.number().int(),
   puntoVenta: z.coerce.number().int().min(1).max(9999),
+  docTipo: z.coerce.number().int(),
+  docNro: z.coerce.number().int().optional(),
   receptorCuit: z.string().optional(),
   fchServDesde: z.string().min(1, 'Requerido'),
   fchServHasta: z.string().min(1, 'Requerido'),
@@ -122,10 +124,19 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
+type DocumentType = { id: number; desc: string }
+
 export function InvoiceForm() {
   const [receptorName, setReceptorName] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [createdInvoice, setCreatedInvoice] = useState<any>(null)
+
+  const { data: docTypesData } = useQuery<{ data: DocumentType[] }>({
+    queryKey: ['document-types'],
+    queryFn: () => fetch('/api/v1/invoices/document-types').then((r) => r.json()),
+    staleTime: Infinity,
+  })
+  const docTypes = docTypesData?.data ?? []
 
   const {
     register, control, handleSubmit, watch, setValue,
@@ -135,6 +146,8 @@ export function InvoiceForm() {
     defaultValues: {
       tipoCbte: 11,
       puntoVenta: 2,
+      docTipo: 99,
+      docNro: undefined,
       receptorCuit: '',
       fchServDesde: firstDayOfMonthIso(),
       fchServHasta: todayIso(),
@@ -146,7 +159,11 @@ export function InvoiceForm() {
   const { fields, append, remove } = useFieldArray({ control, name: 'items' })
   const watchedItems = watch('items')
   const watchedTipoCbte = watch('tipoCbte')
+  const watchedDocTipo = watch('docTipo')
   const totals = calcTotals(watchedItems ?? [])
+
+  const isCuit = watchedDocTipo === 80
+  const isConsumidorFinal = watchedDocTipo === 99
 
   const createInvoice = useMutation({
     mutationFn: async (payload: InvoicePayload) => {
@@ -165,17 +182,21 @@ export function InvoiceForm() {
   function onSubmit(data: FormData) {
     setSubmitError(null)
     const t = calcTotals(data.items)
+    const docNro = (() => {
+      if (data.docTipo === 80) {
+        const n = parseInt((data.receptorCuit ?? '').replace(/\D/g, ''), 10)
+        return Number.isFinite(n) ? n : 0
+      }
+      if (data.docTipo === 99) return 0
+      return data.docNro ?? 0
+    })()
     createInvoice.mutate({
       puntoVenta: data.puntoVenta,
       tipoCbte: data.tipoCbte,
       concepto: 2,
-      docTipo: data.receptorCuit ? 80 : 99,
-      docNro: (() => {
-        if (!data.receptorCuit) return 0
-        const n = parseInt(data.receptorCuit.replace(/\D/g, ''), 10)
-        return Number.isFinite(n) ? n : 0
-      })(),
-      receptorCuit: data.receptorCuit,
+      docTipo: data.docTipo,
+      docNro,
+      receptorCuit: data.docTipo === 80 ? data.receptorCuit : undefined,
       receptorName: receptorName ?? undefined,
       impNeto: t.impNeto,
       impIva: t.impIva,
@@ -265,20 +286,75 @@ export function InvoiceForm() {
           <Separator />
           <SectionLabel>Receptor</SectionLabel>
 
-          <div className="space-y-2">
-            <Label className="text-sm text-muted-foreground">
-              Empresa o persona <span className="font-normal">(opcional)</span>
-            </Label>
-            <ReceptorPicker
-              onSelect={(cuit, name) => {
-                setValue('receptorCuit', cuit)
-                setReceptorName(name)
-              }}
-              onClear={() => {
-                setValue('receptorCuit', '')
-                setReceptorName(null)
-              }}
-            />
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-sm text-muted-foreground">Tipo de documento</Label>
+              <Select
+                value={watchedDocTipo?.toString() ?? '99'}
+                onValueChange={(v) => {
+                  if (!v) return
+                  setValue('docTipo', parseInt(v, 10))
+                  setValue('receptorCuit', '')
+                  setValue('docNro', undefined)
+                  setReceptorName(null)
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue>
+                    {docTypes.find((d) => d.id === watchedDocTipo)?.desc ?? 'Sin identificar'}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {docTypes.length > 0
+                    ? docTypes.map((d) => (
+                        <SelectItem key={d.id} value={d.id.toString()}>{d.desc}</SelectItem>
+                      ))
+                    : (
+                        <>
+                          <SelectItem value="80">CUIT</SelectItem>
+                          <SelectItem value="96">DNI</SelectItem>
+                          <SelectItem value="99">Sin identificar</SelectItem>
+                        </>
+                      )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {isCuit && (
+              <div className="space-y-1.5">
+                <Label className="text-sm text-muted-foreground">
+                  Empresa o persona
+                </Label>
+                <ReceptorPicker
+                  onSelect={(cuit, name, tipoPersona) => {
+                    setValue('receptorCuit', cuit)
+                    setReceptorName(name)
+                    if (tipoPersona === 'JURIDICA') {
+                      setValue('docTipo', 80)
+                    } else if (tipoPersona === 'FISICA') {
+                      setValue('docTipo', 86)
+                      setValue('docNro', parseInt(cuit.replace(/\D/g, ''), 10))
+                    }
+                  }}
+                  onClear={() => {
+                    setValue('receptorCuit', '')
+                    setReceptorName(null)
+                  }}
+                />
+              </div>
+            )}
+
+            {!isCuit && !isConsumidorFinal && (
+              <div className="space-y-1.5">
+                <Label className="text-sm text-muted-foreground">Número de documento</Label>
+                <Input
+                  type="number"
+                  placeholder="Ej: 12345678"
+                  {...register('docNro')}
+                />
+                {errors.docNro && <p className="text-xs text-destructive">{errors.docNro.message}</p>}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

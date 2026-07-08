@@ -1,6 +1,6 @@
 import {
   pgTable, uuid, varchar, smallint, integer,
-  numeric, date, text, jsonb, timestamp,
+  numeric, date, text, jsonb, timestamp, primaryKey,
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 
@@ -40,11 +40,14 @@ export const invoices = pgTable('invoices', {
 })
 
 export const padronCache = pgTable('padron_cache', {
-  cuit: varchar('cuit', { length: 11 }).primaryKey(),
+  cuit: varchar('cuit', { length: 11 }).notNull(),
+  env:  varchar('env', { length: 10 }).notNull().default('sandbox'),
   data: jsonb('data').notNull(),
   fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-})
+}, (t) => ({
+  pk: primaryKey({ columns: [t.cuit, t.env] }),
+}))
 
 export type Invoice    = typeof invoicesProduction.$inferSelect
 export type NewInvoice = typeof invoicesProduction.$inferInsert
