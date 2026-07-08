@@ -114,10 +114,13 @@ function fmtARS(n: number | string) {
   }).format(Number(n))
 }
 
+const DEFAULT_SCRAPE_URL = 'https://www.afip.gob.ar/monotributo/categorias.asp'
+
 function MonotributoCard() {
   const queryClient = useQueryClient()
   const [scraping, setScraping] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [scrapeUrl, setScrapeUrl] = useState(DEFAULT_SCRAPE_URL)
 
   const { data } = useQuery<{ categories: MonotributoCategory[] }>({
     queryKey: ['monotributo-categories'],
@@ -129,7 +132,11 @@ function MonotributoCard() {
     setScraping(true)
     setError(null)
     try {
-      const res = await fetch('/api/v1/settings/scrape-monotributo', { method: 'POST' })
+      const res = await fetch('/api/v1/settings/scrape-monotributo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: scrapeUrl }),
+      })
       const body = await res.json()
       if (!res.ok) {
         setError(body.error ?? 'Error al obtener datos')
@@ -188,6 +195,17 @@ function MonotributoCard() {
             </table>
           </div>
         )}
+
+        <div className="space-y-1.5">
+          <Label htmlFor="scrape-url">URL de origen</Label>
+          <Input
+            id="scrape-url"
+            value={scrapeUrl}
+            onChange={(e) => setScrapeUrl(e.target.value)}
+            placeholder={DEFAULT_SCRAPE_URL}
+            className="font-mono text-xs"
+          />
+        </div>
 
         {error && (
           <div className="flex items-center gap-2 text-sm text-destructive">

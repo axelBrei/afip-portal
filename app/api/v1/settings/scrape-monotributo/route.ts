@@ -1,9 +1,11 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { monotributoCategories } from '@/lib/db/schema'
 import { sql } from 'drizzle-orm'
 
 export const dynamic = 'force-dynamic'
+
+const DEFAULT_URL = 'https://www.afip.gob.ar/monotributo/categorias.asp'
 
 function parseArgentineNumber(s: string): number {
   // "10.277.988,13" → 10277988.13
@@ -26,42 +28,82 @@ function extractCells(rowHtml: string): string[] {
   return cells
 }
 
-async function scrape() {
-  const res = await fetch('https://www.afip.gob.ar/monotributo/categorias.asp', {
+async function scrape(url: string) {
+  console.log(`[scrape-monotributo] fetching: ${url}`)
+
+  const res = await fetch(url, {
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AFIP Portal scraper)' },
     cache: 'no-store',
   })
-  if (!res.ok) throw new Error(`AFIP returned HTTP ${res.status}`)
+
+  console.log(`[scrape-monotributo] response: ${res.status} ${res.statusText}`)
+  console.log(`[scrape-monotributo] content-type: ${res.headers.get('content-type')}`)
+
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`)
 
   const html = await res.text()
+  console.log(`[scrape-monotributo] html length: ${html.length} chars`)
+
+  // Count total <tr> tags to understand the page structure
+  const allTrMatches = html.match(/<tr[^>]*>/gi) ?? []
+  console.log(`[scrape-monotributo] total <tr> tags found: ${allTrMatches.length}`)
 
   const categories: { categ: string; ingresosBrutos: number; cuotaMensual: number }[] = []
   const trRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi
   let trMatch
+  let rowsScanned = 0
 
   while ((trMatch = trRe.exec(html)) !== null) {
     const cells = extractCells(trMatch[1])
+    rowsScanned++
+
+    if (cells.length === 0) continue
+
+    // Log rows whose first cell looks like a category letter (A-K) to catch near-misses
+    if (/^[A-Z]$/.test(cells[0])) {
+      console.log(`[scrape-monotributo] candidate row — first cell: "${cells[0]}", cols: ${cells.length}, values: ${JSON.stringify(cells.slice(0, 4))}...`)
+    }
+
     // Data rows start with a single letter A–K and have at least 11 columns
     if (cells.length >= 11 && /^[A-K]$/.test(cells[0])) {
       const ingresosBrutos = parseArgentineNumber(cells[1])
       // Second-to-last column is "Total – Locaciones y prestaciones de servicios"
       const cuotaMensual = parseArgentineNumber(cells[cells.length - 2])
+
+      console.log(`[scrape-monotributo] matched cat ${cells[0]}: ingresosBrutos=${ingresosBrutos}, cuotaMensual=${cuotaMensual}, allCells=${JSON.stringify(cells)}`)
+
       if (ingresosBrutos > 0) {
         categories.push({ categ: cells[0], ingresosBrutos, cuotaMensual })
+      } else {
+        console.warn(`[scrape-monotributo] skipped cat ${cells[0]} — ingresosBrutos parsed as 0 from "${cells[1]}"`)
       }
     }
   }
 
+  console.log(`[scrape-monotributo] rows scanned: ${rowsScanned}, categories found: ${categories.length}`)
+
   if (categories.length === 0) {
-    throw new Error('No se encontraron categorías en la página de AFIP')
+    // Dump a snippet of the HTML to help diagnose
+    console.error(`[scrape-monotributo] no categories found. HTML snippet (first 2000 chars):\n${html.slice(0, 2000)}`)
+    throw new Error('No se encontraron categorías en la página')
   }
 
   return categories
 }
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
-    const categories = await scrape()
+    let url = DEFAULT_URL
+    try {
+      const body = await req.json()
+      if (typeof body?.url === 'string' && body.url.trim()) {
+        url = body.url.trim()
+      }
+    } catch { /* no body or non-JSON — use default */ }
+
+    console.log(`[scrape-monotributo] POST start, url: ${url}`)
+
+    const categories = await scrape(url)
 
     await db
       .insert(monotributoCategories)
@@ -81,9 +123,11 @@ export async function POST() {
         },
       })
 
+    console.log(`[scrape-monotributo] upserted ${categories.length} categories`)
     return NextResponse.json({ categories, updated: categories.length })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Error desconocido'
+    console.error(`[scrape-monotributo] failed:`, err)
     return NextResponse.json({ error: message }, { status: 502 })
   }
 }
