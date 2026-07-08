@@ -6,31 +6,13 @@ import { eq } from 'drizzle-orm'
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
-const VALID_SCOPES = ['4', '5', '10', '13'] as const
-type Scope = (typeof VALID_SCOPES)[number]
-
-function getService(arca: ReturnType<typeof arcaService.getClient>, scope: Scope) {
-  const map = {
-    '4': arca.registerScopeFourService,
-    '5': arca.registerScopeFiveService,
-    '10': arca.registerScopeTenService,
-    '13': arca.registerScopeThirteenService,
-  } as const
-  return map[scope]
-}
-
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { cuit: string } }
 ) {
   const { cuit } = params
   if (!/^\d{11}$/.test(cuit)) {
     return NextResponse.json({ error: 'CUIT must be 11 digits' }, { status: 400 })
-  }
-
-  const scope = (request.nextUrl.searchParams.get('scope') ?? '10') as Scope
-  if (!VALID_SCOPES.includes(scope)) {
-    return NextResponse.json({ error: `scope must be one of ${VALID_SCOPES.join(', ')}` }, { status: 400 })
   }
 
   try {
@@ -41,14 +23,13 @@ export async function GET(
       .limit(1)
 
     if (cached[0] && new Date(cached[0].expiresAt) > new Date()) {
-      console.log(`[GET /api/v1/padron/${cuit}] Cache hit scope=${scope}`)
+      console.log(`[GET /api/v1/padron/${cuit}] Cache hit`)
       return NextResponse.json({ data: cached[0].data, cached: true })
     }
 
-    console.log(`[GET /api/v1/padron/${cuit}] Cache miss, fetching from ARCA scope=${scope}`)
+    console.log(`[GET /api/v1/padron/${cuit}] Cache miss, fetching from ARCA ws_sr_constancia_inscripcion`)
     const arca = arcaService.getClient()
-    const service = getService(arca, scope)
-    const taxpayer = await service.getTaxpayerDetails(parseInt(cuit, 10))
+    const taxpayer = await arca.registerInscriptionProofService.getTaxpayerDetails(parseInt(cuit, 10))
 
     if (!taxpayer) {
       console.log(`[GET /api/v1/padron/${cuit}] Taxpayer not found in ARCA`)
