@@ -52,6 +52,84 @@ function caeDateToIso(arcaDate: string): string {
   return `${arcaDate.slice(0, 4)}-${arcaDate.slice(4, 6)}-${arcaDate.slice(6, 8)}`
 }
 
+async function generateAndUploadPdf(opts: {
+  id: string
+  arcaCuit: string
+  cbteLetra: string
+  data: {
+    receptorName?: string
+    docTipo: number
+    docNro: number
+    tipoCbte: number
+    puntoVenta: number
+    concepto: number
+    impNeto: number
+    impIva: number
+    impTotal: number
+    items: { description: string; quantity: number; unitPrice: number; ivaRate: number }[]
+  }
+  nroCbte: number
+  today: string
+  cae: string
+  caeFchVto: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  invoices: any
+}) {
+  const { id, arcaCuit, cbteLetra, data, nroCbte, today, cae, caeFchVto, invoices } = opts
+  try {
+    console.log(`[PDF bg] start id=${id}`)
+    const pdfStart = Date.now()
+
+    const t0 = Date.now()
+    const emisor = await getEmisor()
+    console.log(`[PDF bg] getEmisor ${Date.now() - t0}ms`)
+
+    const t1 = Date.now()
+    const pdfGen = new InvoicePdfGenerator({ includeQr: true })
+    const pdfBuffer = await pdfGen.generate({
+      emisor,
+      receptor: {
+        razonSocial: data.receptorName ?? 'Consumidor Final',
+        condicionIva: data.docTipo === 80 ? 'Responsable Inscripto' : 'Consumidor Final',
+        documentoTipo: data.docTipo === 80 ? 'CUIT' : 'DNI',
+        documentoNro: String(data.docNro),
+      },
+      cbteTipo: data.tipoCbte,
+      cbteLetra,
+      puntoVenta: data.puntoVenta,
+      cbteDesde: nroCbte,
+      cbteHasta: nroCbte,
+      cbteFecha: today,
+      concepto: data.concepto,
+      items: data.items.map((item) => ({
+        descripcion: item.description,
+        cantidad: item.quantity,
+        precioUnitario: item.unitPrice,
+        unidadMedida: 'u',
+        subtotal: item.quantity * item.unitPrice,
+        alicuotaIva: item.ivaRate,
+      })),
+      importeNetoGravado: data.impNeto,
+      importeIva: data.impIva,
+      importeTotal: data.impTotal,
+      cae,
+      caeFechaVencimiento: caeFchVto,
+    })
+    console.log(`[PDF bg] pdfGen.generate ${Date.now() - t1}ms size=${pdfBuffer.length}b`)
+
+    const year = new Date().getFullYear()
+    const pdfKey = `invoices/${arcaCuit}/${year}/${id}.pdf`
+    const t2 = Date.now()
+    await uploadPdf(pdfKey, pdfBuffer)
+    console.log(`[PDF bg] uploadPdf ${Date.now() - t2}ms`)
+
+    await db.update(invoices).set({ pdfUrl: pdfKey }).where(eq(invoices.id, id))
+    console.log(`[PDF bg] done total=${Date.now() - pdfStart}ms key=${pdfKey}`)
+  } catch (err) {
+    console.error(`[PDF bg] error id=${id}:`, err)
+  }
+}
+
 export async function GET(request: NextRequest) {
   console.log('[GET /api/v1/invoices] handler entered')
   const { searchParams } = new URL(request.url)
@@ -173,59 +251,20 @@ export async function POST(request: NextRequest) {
   console.log(`[POST /api/v1/invoices] Saved invoice id=${invoice.id}`)
 
   const cbteLetra = data.tipoCbte <= 3 ? 'A' : data.tipoCbte <= 8 ? 'B' : 'C'
-  let pdfKey: string | null = null
-  try {
-    console.log(`[POST /api/v1/invoices] PDF start id=${id}`)
-    const pdfStart = Date.now()
 
-    const t0 = Date.now()
-    const emisor = await getEmisor()
-    console.log(`[POST /api/v1/invoices] getEmisor ${Date.now() - t0}ms`)
+  // Fire-and-forget: invoice is already persisted; PDF runs in background.
+  // The client can download via GET /api/v1/invoices/[id]/pdf once ready.
+  void generateAndUploadPdf({
+    id,
+    arcaCuit,
+    cbteLetra,
+    data,
+    nroCbte,
+    today,
+    cae,
+    caeFchVto,
+    invoices,
+  })
 
-    const t1 = Date.now()
-    const pdfGen = new InvoicePdfGenerator({ includeQr: true })
-    const pdfBuffer = await pdfGen.generate({
-      emisor,
-      receptor: {
-        razonSocial: data.receptorName ?? 'Consumidor Final',
-        condicionIva: data.docTipo === 80 ? 'Responsable Inscripto' : 'Consumidor Final',
-        documentoTipo: data.docTipo === 80 ? 'CUIT' : 'DNI',
-        documentoNro: String(data.docNro),
-      },
-      cbteTipo: data.tipoCbte,
-      cbteLetra,
-      puntoVenta: data.puntoVenta,
-      cbteDesde: nroCbte,
-      cbteHasta: nroCbte,
-      cbteFecha: today,
-      concepto: data.concepto,
-      items: data.items.map((item) => ({
-        descripcion: item.description,
-        cantidad: item.quantity,
-        precioUnitario: item.unitPrice,
-        unidadMedida: 'u',
-        subtotal: item.quantity * item.unitPrice,
-        alicuotaIva: item.ivaRate,
-      })),
-      importeNetoGravado: data.impNeto,
-      importeIva: data.impIva,
-      importeTotal: data.impTotal,
-      cae,
-      caeFechaVencimiento: caeFchVto,
-    })
-    console.log(`[POST /api/v1/invoices] pdfGen.generate ${Date.now() - t1}ms size=${pdfBuffer.length}b`)
-
-    const year = new Date().getFullYear()
-    pdfKey = `invoices/${arcaCuit}/${year}/${id}.pdf`
-    const t2 = Date.now()
-    await uploadPdf(pdfKey, pdfBuffer)
-    console.log(`[POST /api/v1/invoices] uploadPdf ${Date.now() - t2}ms`)
-
-    await db.update(invoices).set({ pdfUrl: pdfKey }).where(eq(invoices.id, id))
-    console.log(`[POST /api/v1/invoices] PDF done total=${Date.now() - pdfStart}ms key=${pdfKey}`)
-  } catch (err) {
-    console.error('[POST /api/v1/invoices] PDF generation/upload error (invoice already saved):', err)
-  }
-
-  return NextResponse.json({ ...invoice, pdfUrl: pdfKey }, { status: 201 })
+  return NextResponse.json({ ...invoice, pdfUrl: null }, { status: 201 })
 }

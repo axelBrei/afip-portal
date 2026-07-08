@@ -17,6 +17,75 @@ function caeDateToIso(arcaDate: string): string {
   return `${arcaDate.slice(0, 4)}-${arcaDate.slice(4, 6)}-${arcaDate.slice(6, 8)}`
 }
 
+async function generateCreditNotePdf(opts: {
+  id: string
+  arcaCuit: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  original: any
+  nroCbte: number
+  today: string
+  cae: string
+  caeFchVto: string
+  items: { description: string; quantity: number; unitPrice: number; ivaRate: number }[]
+  totalStr: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  invoices: any
+}) {
+  const { id, arcaCuit, original, nroCbte, today, cae, caeFchVto, items, totalStr, invoices } = opts
+  try {
+    console.log(`[PDF bg credit-note] start id=${id}`)
+    const pdfStart = Date.now()
+
+    const t0 = Date.now()
+    const emisor = await getEmisor()
+    console.log(`[PDF bg credit-note] getEmisor ${Date.now() - t0}ms`)
+
+    const t1 = Date.now()
+    const pdfGen = new InvoicePdfGenerator({ includeQr: true })
+    const pdfBuffer = await pdfGen.generate({
+      emisor,
+      receptor: {
+        razonSocial: original.receptorName ?? 'Consumidor Final',
+        condicionIva: original.receptorCuit ? 'Responsable Inscripto' : 'Consumidor Final',
+        documentoTipo: original.receptorCuit ? 'CUIT' : 'DNI',
+        documentoNro: original.receptorCuit ?? '0',
+      },
+      cbteTipo: 13,
+      cbteLetra: 'C',
+      puntoVenta: original.puntoVenta,
+      cbteDesde: nroCbte,
+      cbteHasta: nroCbte,
+      cbteFecha: today,
+      concepto: 2,
+      items: items.map((item) => ({
+        descripcion: item.description,
+        cantidad: item.quantity,
+        precioUnitario: item.unitPrice,
+        unidadMedida: 'u',
+        subtotal: item.quantity * item.unitPrice,
+        alicuotaIva: item.ivaRate,
+      })),
+      importeNetoGravado: Number(totalStr),
+      importeIva: 0,
+      importeTotal: Number(totalStr),
+      cae,
+      caeFechaVencimiento: caeFchVto,
+    })
+    console.log(`[PDF bg credit-note] pdfGen.generate ${Date.now() - t1}ms size=${pdfBuffer.length}b`)
+
+    const year = new Date().getFullYear()
+    const pdfKey = `invoices/${arcaCuit}/${year}/${id}.pdf`
+    const t2 = Date.now()
+    await uploadPdf(pdfKey, pdfBuffer)
+    console.log(`[PDF bg credit-note] uploadPdf ${Date.now() - t2}ms`)
+
+    await db.update(invoices).set({ pdfUrl: pdfKey }).where(eq(invoices.id, id))
+    console.log(`[PDF bg credit-note] done total=${Date.now() - pdfStart}ms key=${pdfKey}`)
+  } catch (err) {
+    console.error(`[PDF bg credit-note] error id=${id}:`, err)
+  }
+}
+
 export async function POST(
   _request: NextRequest,
   { params }: { params: { id: string } }
@@ -135,59 +204,19 @@ export async function POST(
       ? (rawReq._items as { description: string; quantity: number; unitPrice: number; ivaRate: number }[])
       : [{ description: 'Anulación de factura', quantity: 1, unitPrice: Number(totalStr), ivaRate: 0 }]
 
-  let pdfKey: string | null = null
-  try {
-    const pdfStart = Date.now()
-    console.log(`[POST credit-note] PDF start id=${id}`)
+  // Fire-and-forget: credit note already persisted; PDF runs in background.
+  void generateCreditNotePdf({
+    id,
+    arcaCuit,
+    original,
+    nroCbte,
+    today,
+    cae,
+    caeFchVto,
+    items,
+    totalStr,
+    invoices,
+  })
 
-    const t0 = Date.now()
-    const emisor = await getEmisor()
-    console.log(`[POST credit-note] getEmisor ${Date.now() - t0}ms`)
-
-    const t1 = Date.now()
-    const pdfGen = new InvoicePdfGenerator({ includeQr: true })
-    const pdfBuffer = await pdfGen.generate({
-      emisor,
-      receptor: {
-        razonSocial: original.receptorName ?? 'Consumidor Final',
-        condicionIva: original.receptorCuit ? 'Responsable Inscripto' : 'Consumidor Final',
-        documentoTipo: original.receptorCuit ? 'CUIT' : 'DNI',
-        documentoNro: original.receptorCuit ?? '0',
-      },
-      cbteTipo: 13,
-      cbteLetra: 'C',
-      puntoVenta: original.puntoVenta,
-      cbteDesde: nroCbte,
-      cbteHasta: nroCbte,
-      cbteFecha: today,
-      concepto: 2,
-      items: items.map((item) => ({
-        descripcion: item.description,
-        cantidad: item.quantity,
-        precioUnitario: item.unitPrice,
-        unidadMedida: 'u',
-        subtotal: item.quantity * item.unitPrice,
-        alicuotaIva: item.ivaRate,
-      })),
-      importeNetoGravado: Number(totalStr),
-      importeIva: 0,
-      importeTotal: Number(totalStr),
-      cae,
-      caeFechaVencimiento: caeFchVto,
-    })
-    console.log(`[POST credit-note] pdfGen.generate ${Date.now() - t1}ms size=${pdfBuffer.length}b`)
-
-    const year = new Date().getFullYear()
-    pdfKey = `invoices/${arcaCuit}/${year}/${id}.pdf`
-    const t2 = Date.now()
-    await uploadPdf(pdfKey, pdfBuffer)
-    console.log(`[POST credit-note] uploadPdf ${Date.now() - t2}ms`)
-
-    await db.update(invoices).set({ pdfUrl: pdfKey }).where(eq(invoices.id, id))
-    console.log(`[POST credit-note] PDF done total=${Date.now() - pdfStart}ms key=${pdfKey}`)
-  } catch (err) {
-    console.error('[POST credit-note] PDF error (NC already saved):', err)
-  }
-
-  return NextResponse.json({ ...creditNote, pdfUrl: pdfKey }, { status: 201 })
+  return NextResponse.json({ ...creditNote, pdfUrl: null }, { status: 201 })
 }
