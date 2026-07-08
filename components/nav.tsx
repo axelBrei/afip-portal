@@ -7,7 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Input } from '@/components/ui/input'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { FileText, Search, Settings, LogOut } from 'lucide-react'
+import { FileText, Search, Settings, LogOut, Users } from 'lucide-react'
 
 type Settings = { activeEnv: string }
 
@@ -95,6 +95,13 @@ export function Nav() {
           >
             <FileText className="h-4 w-4 mr-1" />
             Facturas
+          </Link>
+          <Link
+            href="/padron"
+            className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}
+          >
+            <Users className="h-4 w-4 mr-1" />
+            Padrón
           </Link>
           <Link
             href="/settings"

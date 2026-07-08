@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -16,6 +16,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { Trash2, Plus, Download, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ReceptorPicker } from './receptor-picker'
 
 const IVA_RATES = [
   { id: 3, label: '0%', rate: 0 },
@@ -123,7 +124,6 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 export function InvoiceForm() {
   const [receptorName, setReceptorName] = useState<string | null>(null)
-  const [lookingUp, setLookingUp] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [createdInvoice, setCreatedInvoice] = useState<any>(null)
 
@@ -135,7 +135,7 @@ export function InvoiceForm() {
     defaultValues: {
       tipoCbte: 11,
       puntoVenta: 2,
-      receptorCuit: '30715446142',
+      receptorCuit: '',
       fchServDesde: firstDayOfMonthIso(),
       fchServHasta: todayIso(),
       fchVtoPago: thirtyDaysFromNowIso(),
@@ -145,29 +145,8 @@ export function InvoiceForm() {
 
   const { fields, append, remove } = useFieldArray({ control, name: 'items' })
   const watchedItems = watch('items')
-  const watchedCuit = watch('receptorCuit')
   const watchedTipoCbte = watch('tipoCbte')
   const totals = calcTotals(watchedItems ?? [])
-
-  useEffect(() => {
-    if (/^\d{11}$/.test(watchedCuit ?? '')) lookupCuit()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedCuit])
-
-  async function lookupCuit() {
-    const cuit = (watchedCuit ?? '').replace(/\D/g, '')
-    if (cuit.length !== 11) return
-    setLookingUp(true)
-    try {
-      const res = await fetch(`/api/v1/padron/${cuit}`)
-      if (res.ok) {
-        const body = await res.json()
-        setReceptorName(body.data?.persona?.denominacion ?? body.data?.persona?.apellido ?? null)
-      }
-    } finally {
-      setLookingUp(false)
-    }
-  }
 
   const createInvoice = useMutation({
     mutationFn: async (payload: InvoicePayload) => {
@@ -288,17 +267,18 @@ export function InvoiceForm() {
 
           <div className="space-y-2">
             <Label className="text-sm text-muted-foreground">
-              CUIT <span className="font-normal">(opcional)</span>
+              Empresa o persona <span className="font-normal">(opcional)</span>
             </Label>
-            <div className="flex gap-2">
-              <Input {...register('receptorCuit')} placeholder="20111111112" maxLength={11} />
-              <Button type="button" variant="outline" size="sm" onClick={lookupCuit} disabled={lookingUp} className="shrink-0 px-4">
-                {lookingUp ? 'Buscando...' : 'Buscar'}
-              </Button>
-            </div>
-            {receptorName && (
-              <p className="text-sm font-medium text-foreground">{receptorName}</p>
-            )}
+            <ReceptorPicker
+              onSelect={(cuit, name) => {
+                setValue('receptorCuit', cuit)
+                setReceptorName(name)
+              }}
+              onClear={() => {
+                setValue('receptorCuit', '')
+                setReceptorName(null)
+              }}
+            />
           </div>
         </CardContent>
       </Card>
