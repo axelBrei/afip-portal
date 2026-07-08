@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { arcaService } from '@/lib/arca/service'
+import { getEmisor } from '@/lib/arca/emisor'
 import { getInvoicesTable } from '@/lib/db/invoices-table'
 import { uploadPdf } from '@/lib/r2/client'
 import { InvoicePdfGenerator } from '@arcasdk/pdf'
@@ -174,16 +175,10 @@ export async function POST(request: NextRequest) {
   const cbteLetra = data.tipoCbte <= 3 ? 'A' : data.tipoCbte <= 8 ? 'B' : 'C'
   let pdfKey: string | null = null
   try {
+    const emisor = await getEmisor()
     const pdfGen = new InvoicePdfGenerator({ includeQr: true })
     const pdfBuffer = await pdfGen.generate({
-      emisor: {
-        cuit: arcaCuit,
-        razonSocial: process.env.ARCA_RAZON_SOCIAL ?? '',
-        domicilioComercial: process.env.ARCA_DOMICILIO ?? '',
-        condicionIva: process.env.ARCA_CONDICION_IVA ?? 'Responsable Inscripto',
-        iibb: process.env.ARCA_IIBB ?? '',
-        fechaInicioActividades: process.env.ARCA_INICIO_ACTIVIDADES ?? '',
-      },
+      emisor,
       receptor: {
         razonSocial: data.receptorName ?? 'Consumidor Final',
         condicionIva: data.docTipo === 80 ? 'Responsable Inscripto' : 'Consumidor Final',

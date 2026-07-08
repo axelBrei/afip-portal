@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getInvoicesTable } from '@/lib/db/invoices-table'
 import { getPresignedUrl, uploadPdf } from '@/lib/r2/client'
+import { getEmisor } from '@/lib/arca/emisor'
 import { InvoicePdfGenerator } from '@arcasdk/pdf'
 import { eq } from 'drizzle-orm'
 
@@ -31,16 +32,10 @@ export async function POST(
   const cbteFecha = invoice.createdAt.toISOString().slice(0, 10).replace(/-/g, '')
 
   try {
+    const emisor = await getEmisor()
     const pdfGen = new InvoicePdfGenerator({ includeQr: true })
     const pdfBuffer = await pdfGen.generate({
-      emisor: {
-        cuit: arcaCuit,
-        razonSocial: process.env.ARCA_RAZON_SOCIAL ?? '',
-        domicilioComercial: process.env.ARCA_DOMICILIO ?? '',
-        condicionIva: process.env.ARCA_CONDICION_IVA ?? 'Responsable Inscripto',
-        iibb: process.env.ARCA_IIBB ?? '',
-        fechaInicioActividades: process.env.ARCA_INICIO_ACTIVIDADES ?? '',
-      },
+      emisor,
       receptor: {
         razonSocial: invoice.receptorName ?? 'Consumidor Final',
         condicionIva: docTipo === 80 ? 'Responsable Inscripto' : 'Consumidor Final',

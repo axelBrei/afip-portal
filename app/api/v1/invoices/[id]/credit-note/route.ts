@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { arcaService } from '@/lib/arca/service'
 import { getInvoicesTable } from '@/lib/db/invoices-table'
 import { uploadPdf } from '@/lib/r2/client'
+import { getEmisor } from '@/lib/arca/emisor'
 import { InvoicePdfGenerator } from '@arcasdk/pdf'
 import { eq } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
@@ -136,16 +137,10 @@ export async function POST(
 
   let pdfKey: string | null = null
   try {
+    const emisor = await getEmisor()
     const pdfGen = new InvoicePdfGenerator({ includeQr: true })
     const pdfBuffer = await pdfGen.generate({
-      emisor: {
-        cuit: arcaCuit,
-        razonSocial: process.env.ARCA_RAZON_SOCIAL ?? '',
-        domicilioComercial: process.env.ARCA_DOMICILIO ?? '',
-        condicionIva: process.env.ARCA_CONDICION_IVA ?? 'Responsable Inscripto',
-        iibb: process.env.ARCA_IIBB ?? '',
-        fechaInicioActividades: process.env.ARCA_INICIO_ACTIVIDADES ?? '',
-      },
+      emisor,
       receptor: {
         razonSocial: original.receptorName ?? 'Consumidor Final',
         condicionIva: original.receptorCuit ? 'Responsable Inscripto' : 'Consumidor Final',
