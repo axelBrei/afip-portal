@@ -3,10 +3,7 @@
 import { useSuspenseQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import Link from 'next/link'
-import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Separator } from '@/components/ui/separator'
 import { Download, FileText, RotateCcw, CheckCircle2, ArrowLeft, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Invoice } from '@/lib/db/schema'
@@ -18,7 +15,8 @@ const TIPO_LABEL: Record<number, string> = {
 }
 
 async function fetchInvoice(id: string): Promise<Invoice> {
-  const res = await fetch(`/api/v1/invoices/${id}`)
+  const base = typeof window !== 'undefined' ? '' : 'http://localhost:3000'
+  const res = await fetch(`${base}/api/v1/invoices/${id}`)
   if (!res.ok) throw new Error('Invoice not found')
   return res.json()
 }
@@ -31,25 +29,47 @@ function voucherRef(inv: Invoice) {
   return `${inv.puntoVenta.toString().padStart(5, '0')}-${inv.nroCbte.toString().padStart(8, '0')}`
 }
 
+function Eyebrow({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+      {children}
+    </p>
+  )
+}
+
 function RelatedBanner({
   label,
+  sublabel,
   href,
   icon,
+  accent = false,
 }: {
   label: string
+  sublabel?: string
   href: string
   icon: React.ReactNode
+  accent?: boolean
 }) {
   return (
     <Link
       href={href}
-      className="flex items-center justify-between px-4 py-3 rounded-lg border border-border bg-muted/40 hover:bg-muted transition-colors text-sm"
+      className={cn(
+        'flex items-center justify-between px-4 py-3 rounded-lg border bg-card transition-colors text-sm group',
+        accent
+          ? 'border-primary/40 hover:border-primary/60 hover:bg-accent'
+          : 'border-border hover:bg-accent'
+      )}
     >
-      <div className="flex items-center gap-2 text-muted-foreground">
-        {icon}
-        <span>{label}</span>
+      <div className="flex items-center gap-2.5">
+        <span className={cn('shrink-0', accent ? 'text-primary' : 'text-muted-foreground')}>
+          {icon}
+        </span>
+        <div>
+          <span className="text-foreground">{label}</span>
+          {sublabel && <span className="text-muted-foreground ml-2 text-xs">{sublabel}</span>}
+        </div>
       </div>
-      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
     </Link>
   )
 }
@@ -109,11 +129,16 @@ export function InvoiceDetail({ id }: { id: string }) {
   const isNC = invoice.tipoCbte === 13
   const tipoLabel = TIPO_LABEL[invoice.tipoCbte] ?? `Tipo ${invoice.tipoCbte}`
   const creditNoteId = invoice.creditNoteId ?? freshCreditNote?.id ?? null
+  const invoiceDate = new Date(invoice.createdAt).toLocaleDateString('es-AR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  })
 
   return (
     <div className="max-w-2xl mx-auto space-y-3">
 
-      {/* Relation banners */}
+      {/* NC → anulled invoice banner */}
       {isNC && invoice.originalInvoiceId && (
         <RelatedBanner
           label="Anula Factura C"
@@ -122,115 +147,134 @@ export function InvoiceDetail({ id }: { id: string }) {
         />
       )}
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <p className="text-xs text-muted-foreground mb-0.5">{tipoLabel}</p>
-            <CardTitle>{voucherRef(invoice)}</CardTitle>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap justify-end">
-            {invoice.pdfUrl ? (
-              <a
-                href={`/api/v1/invoices/${invoice.id}/pdf`}
-                target="_blank"
-                rel="noreferrer"
-                className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
-              >
-                <Download className="h-4 w-4 mr-1.5" />
-                PDF
-              </a>
-            ) : (
-              <Button size="sm" variant="outline" onClick={handleGeneratePdf} disabled={generating}>
-                <FileText className="h-4 w-4 mr-1.5" />
-                {generating ? 'Generando...' : 'Generar PDF'}
-              </Button>
-            )}
-            {isFacC && !creditNoteId && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleCreditNote}
-                disabled={crediting}
-                className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
-              >
-                <RotateCcw className="h-4 w-4 mr-1.5" />
-                {crediting ? 'Anulando...' : 'Crear NC'}
-              </Button>
-            )}
-          </div>
-        </CardHeader>
+      {/* Main card */}
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
 
-        {genError && <p className="px-6 pb-2 text-sm text-destructive">{genError}</p>}
-        {creditError && <p className="px-6 pb-2 text-sm text-destructive">{creditError}</p>}
-
-        <CardContent className="space-y-4 text-sm">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-muted-foreground">Receptor</p>
-              <p className="font-medium">{invoice.receptorName ?? '—'}</p>
-              {invoice.receptorCuit && (
-                <p className="text-muted-foreground font-mono text-xs">{invoice.receptorCuit}</p>
+        {/* Header */}
+        <div className="px-6 pt-6 pb-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <Eyebrow>{tipoLabel}</Eyebrow>
+              <h1 className="mt-1.5 text-[2rem] font-semibold tracking-tight text-foreground font-mono leading-none">
+                {voucherRef(invoice)}
+              </h1>
+              <p className="mt-1.5 text-sm text-muted-foreground">{invoiceDate}</p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 pt-0.5">
+              {invoice.pdfUrl ? (
+                <a
+                  href={`/api/v1/invoices/${invoice.id}/pdf`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
+                >
+                  <Download className="h-4 w-4 mr-1.5" />
+                  PDF
+                </a>
+              ) : (
+                <Button size="sm" variant="outline" onClick={handleGeneratePdf} disabled={generating}>
+                  <FileText className="h-4 w-4 mr-1.5" />
+                  {generating ? 'Generando…' : 'Generar PDF'}
+                </Button>
+              )}
+              {isFacC && !creditNoteId && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleCreditNote}
+                  disabled={crediting}
+                  className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <RotateCcw className="h-4 w-4 mr-1.5" />
+                  {crediting ? 'Anulando…' : 'Crear NC'}
+                </Button>
               )}
             </div>
-            <div>
-              <p className="text-muted-foreground">Fecha</p>
-              <p className="font-medium">
-                {new Date(invoice.createdAt).toLocaleDateString('es-AR')}
+          </div>
+          {(genError || creditError) && (
+            <p className="mt-3 text-sm text-destructive">{genError ?? creditError}</p>
+          )}
+        </div>
+
+        <div className="border-t border-border" />
+
+        {/* Body */}
+        <div className="px-6 py-5 space-y-6">
+
+          {/* Receptor */}
+          <div>
+            <Eyebrow>Receptor</Eyebrow>
+            <div className="mt-2 space-y-0.5">
+              <p className="text-sm font-medium text-foreground">
+                {invoice.receptorName ?? 'Consumidor Final'}
               </p>
+              {invoice.receptorCuit && (
+                <p className="font-mono text-xs text-muted-foreground">
+                  CUIT {invoice.receptorCuit}
+                </p>
+              )}
             </div>
           </div>
 
-          <Separator />
-
-          <div className="space-y-1.5">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Neto gravado</span>
-              <span className="font-mono">${fmt(invoice.amountNet)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">IVA</span>
-              <span className="font-mono">${fmt(invoice.amountIva)}</span>
-            </div>
-            <Separator />
-            <div className="flex justify-between font-semibold">
-              <span>Total</span>
-              <span className="font-mono">${fmt(invoice.amountTotal)}</span>
+          {/* Amounts */}
+          <div>
+            <Eyebrow>Importes</Eyebrow>
+            <div className="mt-3 space-y-2.5">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Neto gravado</span>
+                <span className="font-mono tabular-nums">${fmt(invoice.amountNet)}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">IVA</span>
+                <span className="font-mono tabular-nums">${fmt(invoice.amountIva)}</span>
+              </div>
+              <div className="border-t border-border" />
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-foreground">Total</span>
+                <span className="font-mono text-2xl font-semibold text-foreground tabular-nums tracking-tight">
+                  ${fmt(invoice.amountTotal)}
+                </span>
+              </div>
             </div>
           </div>
 
-          <Separator />
-
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-muted-foreground text-xs mb-0.5">CAE</p>
-              <p className="font-mono text-sm">{invoice.cae}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Vence {invoice.caeFchVto}</p>
+          {/* CAE */}
+          <div className="rounded-md bg-muted/50 border border-border/60 px-4 py-3.5">
+            <div className="flex items-center justify-between mb-2">
+              <Eyebrow>CAE</Eyebrow>
+              <span className="text-[11px] text-muted-foreground">Vence {invoice.caeFchVto}</span>
             </div>
-            <Badge variant="outline">{tipoLabel}</Badge>
+            <p className="font-mono text-sm text-foreground tracking-wide">{invoice.cae}</p>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* NC relation — existing from DB or just created */}
+        </div>
+      </div>
+
+      {/* Factura C → NC link */}
       {isFacC && creditNoteId && !freshCreditNote && (
         <RelatedBanner
-          label={`Nota de Crédito emitida`}
+          label="Nota de Crédito emitida"
+          sublabel={`→ ver NC`}
           href={`/invoices/${creditNoteId}`}
           icon={<RotateCcw className="h-4 w-4" />}
+          accent
         />
       )}
 
+      {/* Fresh NC success */}
       {freshCreditNote && (
-        <Card className="border-primary/30">
-          <CardContent className="pt-5 pb-5 px-6 space-y-3">
+        <div className="rounded-lg border border-primary/30 bg-card overflow-hidden">
+          <div className="px-5 py-4 space-y-4">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-              <p className="font-medium text-sm">Nota de Crédito autorizada</p>
+              <p className="text-sm font-medium">Nota de Crédito autorizada</p>
             </div>
-            <div className="bg-muted rounded-md px-4 py-3 space-y-0.5">
-              <p className="text-xs text-muted-foreground">NC {voucherRef(freshCreditNote)}</p>
-              <p className="font-mono text-sm">{freshCreditNote.cae}</p>
-              <p className="text-xs text-muted-foreground">Vence {freshCreditNote.caeFchVto}</p>
+            <div className="rounded-md bg-muted/50 border border-border/60 px-4 py-3">
+              <p className="text-xs text-muted-foreground mb-1">
+                NC {voucherRef(freshCreditNote)}
+              </p>
+              <p className="font-mono text-sm text-foreground">{freshCreditNote.cae}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Vence {freshCreditNote.caeFchVto}</p>
             </div>
             <div className="flex gap-2">
               {freshCreditNote.pdfUrl && (
@@ -251,9 +295,10 @@ export function InvoiceDetail({ id }: { id: string }) {
                 Ver NC
               </Link>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
+
     </div>
   )
 }
