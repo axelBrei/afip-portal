@@ -1,6 +1,6 @@
 'use client'
 
-import { useSuspenseQuery, useQueryClient } from '@tanstack/react-query'
+import { useSuspenseQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
-import { CheckCircle, XCircle, AlertTriangle, Upload } from 'lucide-react'
+import { CheckCircle, XCircle, AlertTriangle, Upload, RefreshCw } from 'lucide-react'
+import type { MonotributoCategory } from '@/lib/db/schema'
 
 type ArcaEnv = 'production' | 'sandbox'
 
@@ -107,6 +108,103 @@ function UploadSection({ env, onSuccess }: UploadSectionProps) {
   )
 }
 
+function fmtARS(n: number | string) {
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency', currency: 'ARS', maximumFractionDigits: 0,
+  }).format(Number(n))
+}
+
+function MonotributoCard() {
+  const queryClient = useQueryClient()
+  const [scraping, setScraping] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const { data } = useQuery<{ categories: MonotributoCategory[] }>({
+    queryKey: ['monotributo-categories'],
+    queryFn: () => fetch('/api/v1/settings/scrape-monotributo').then((r) => r.json()),
+    staleTime: 60_000,
+  })
+
+  async function handleScrape() {
+    setScraping(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/v1/settings/scrape-monotributo', { method: 'POST' })
+      const body = await res.json()
+      if (!res.ok) {
+        setError(body.error ?? 'Error al obtener datos')
+      } else {
+        await queryClient.invalidateQueries({ queryKey: ['monotributo-categories'] })
+      }
+    } catch {
+      setError('Error de red')
+    } finally {
+      setScraping(false)
+    }
+  }
+
+  const categories = data?.categories ?? []
+  const lastUpdated = categories[0]?.updatedAt
+    ? new Date(categories[0].updatedAt).toLocaleDateString('es-AR', {
+        day: '2-digit', month: 'short', year: 'numeric',
+      })
+    : null
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle>Límites Monotributo</CardTitle>
+          {lastUpdated && (
+            <span className="text-xs text-muted-foreground">Actualizado {lastUpdated}</span>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Categorías vigentes de AFIP, incluyendo ingreso bruto anual máximo y cuota mensual
+          (Locaciones y prestaciones de servicios).
+        </p>
+
+        {categories.length > 0 && (
+          <div className="rounded-md border border-border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/30">
+                  <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Cat.</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Ing. Brutos anuales</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Cuota mensual</th>
+                </tr>
+              </thead>
+              <tbody>
+                {categories.map((c, i) => (
+                  <tr key={c.categ} className={i % 2 === 0 ? '' : 'bg-muted/20'}>
+                    <td className="px-3 py-2 font-semibold text-foreground">{c.categ}</td>
+                    <td className="px-3 py-2 text-right font-mono tabular-nums">{fmtARS(c.ingresosBrutos)}</td>
+                    <td className="px-3 py-2 text-right font-mono tabular-nums">{fmtARS(c.cuotaMensual)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {error && (
+          <div className="flex items-center gap-2 text-sm text-destructive">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            {error}
+          </div>
+        )}
+
+        <Button variant="outline" onClick={handleScrape} disabled={scraping}>
+          <RefreshCw className={`h-4 w-4 mr-1.5 ${scraping ? 'animate-spin' : ''}`} />
+          {scraping ? 'Consultando AFIP…' : 'Actualizar desde AFIP'}
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
 export function SettingsForm() {
   const queryClient = useQueryClient()
   const { data } = useSuspenseQuery({ queryKey: ['settings'], queryFn: fetchSettings })
@@ -187,6 +285,8 @@ export function SettingsForm() {
           </div>
         </CardContent>
       </Card>
+
+      <MonotributoCard />
 
       {/* Certificate upload */}
       <Card>

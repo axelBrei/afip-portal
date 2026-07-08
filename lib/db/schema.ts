@@ -49,6 +49,16 @@ export const padronCache = pgTable('padron_cache', {
   pk: primaryKey({ columns: [t.cuit, t.env] }),
 }))
 
-export type Invoice    = typeof invoicesProduction.$inferSelect
-export type NewInvoice = typeof invoicesProduction.$inferInsert
-export type PadronCache = typeof padronCache.$inferSelect
+export const monotributoCategories = pgTable('monotributo_categories', {
+  categ: varchar('categ', { length: 2 }).primaryKey(),
+  ingresosBrutos: numeric('ingresos_brutos', { precision: 14, scale: 2 }).notNull(),
+  cuotaMensual: numeric('cuota_mensual', { precision: 14, scale: 2 }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .default(sql`now()`)
+    .notNull(),
+})
+
+export type Invoice                = typeof invoicesProduction.$inferSelect
+export type NewInvoice             = typeof invoicesProduction.$inferInsert
+export type PadronCache            = typeof padronCache.$inferSelect
+export type MonotributoCategory    = typeof monotributoCategories.$inferSelect
