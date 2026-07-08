@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { arcaService } from '@/lib/arca/service'
 import { getInvoicesTable } from '@/lib/db/invoices-table'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 
 export const dynamic = 'force-dynamic'
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
   const existing = await db
     .select({ nroCbte: invoices.nroCbte })
     .from(invoices)
-    .where(eq(invoices.tipoCbte, tipoCbte))
+    .where(and(eq(invoices.tipoCbte, tipoCbte), eq(invoices.puntoVenta, puntoVenta)))
 
   const existingSet = new Set(existing.map((r) => r.nroCbte))
 

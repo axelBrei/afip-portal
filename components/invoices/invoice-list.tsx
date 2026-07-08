@@ -24,14 +24,10 @@ const INVOICE_TYPE_LABELS: Record<number, string> = {
   11: 'C', 12: 'C NdD', 13: 'C NdC',
 }
 
-const SYNC_TYPES = [
-  { tipoCbte: 1, puntoVenta: 1 },
-  { tipoCbte: 6, puntoVenta: 1 },
-  { tipoCbte: 11, puntoVenta: 1 },
-  { tipoCbte: 1, puntoVenta: 2 },
-  { tipoCbte: 6, puntoVenta: 2 },
-  { tipoCbte: 11, puntoVenta: 2 },
-]
+const SYNC_TYPES = [1, 2, 3, 6, 7, 8, 11, 12, 13].flatMap((tipoCbte) => [
+  { tipoCbte, puntoVenta: 1 },
+  { tipoCbte, puntoVenta: 2 },
+])
 
 export function InvoiceList({ page = 1 }: { page?: number }) {
   const queryClient = useQueryClient()
