@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { invoices } from '@/lib/db/schema'
+import { getInvoicesTable } from '@/lib/db/invoices-table'
 import { eq } from 'drizzle-orm'
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const invoices = getInvoicesTable()
   try {
     const rows = await db
       .select()

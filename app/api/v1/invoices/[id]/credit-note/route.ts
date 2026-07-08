@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { invoices } from '@/lib/db/schema'
 import { arcaService } from '@/lib/arca/service'
+import { getInvoicesTable } from '@/lib/db/invoices-table'
 import { uploadPdf } from '@/lib/r2/client'
 import { InvoicePdfGenerator } from '@arcasdk/pdf'
 import { eq } from 'drizzle-orm'
@@ -23,6 +23,7 @@ export async function POST(
   const arcaCuit = process.env.ARCA_CUIT
   if (!arcaCuit) return NextResponse.json({ error: 'ARCA_CUIT not configured' }, { status: 503 })
 
+  const invoices = getInvoicesTable()
   const rows = await db.select().from(invoices).where(eq(invoices.id, params.id)).limit(1)
   const original = rows[0]
   if (!original) return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
@@ -117,7 +118,6 @@ export async function POST(
       amountNet: totalStr,
       amountIva: '0',
       amountTotal: totalStr,
-      arcaEnv: arcaService.getActiveEnv(),
       originalInvoiceId: params.id,
       receptorCuit: original.receptorCuit,
       receptorName: original.receptorName,

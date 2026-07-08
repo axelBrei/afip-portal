@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { invoices } from '@/lib/db/schema'
 import { arcaService } from '@/lib/arca/service'
+import { getInvoicesTable } from '@/lib/db/invoices-table'
 import { uploadPdf } from '@/lib/r2/client'
 import { InvoicePdfGenerator } from '@arcasdk/pdf'
 import { z } from 'zod'
-import { and, desc, eq } from 'drizzle-orm'
+import { desc, eq } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 
 console.log('[invoices/route] module loaded')
@@ -57,13 +57,13 @@ export async function GET(request: NextRequest) {
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '20', 10)))
   const offset = (page - 1) * limit
+  const invoices = getInvoicesTable()
   const activeEnv = arcaService.getActiveEnv()
 
   try {
     const rows = await db
       .select()
       .from(invoices)
-      .where(eq(invoices.arcaEnv, activeEnv))
       .orderBy(desc(invoices.createdAt))
       .limit(limit)
       .offset(offset)
@@ -147,6 +147,7 @@ export async function POST(request: NextRequest) {
   console.log(`[POST /api/v1/invoices] ARCA approved nroCbte=${nroCbte} cae=${cae}`)
 
   // Save to DB immediately so the invoice is not lost if PDF generation fails
+  const invoices = getInvoicesTable()
   const id = randomUUID()
   const [invoice] = await db
     .insert(invoices)
@@ -161,7 +162,6 @@ export async function POST(request: NextRequest) {
       amountNet: data.impNeto.toString(),
       amountIva: data.impIva.toString(),
       amountTotal: data.impTotal.toString(),
-      arcaEnv: arcaService.getActiveEnv(),
       receptorCuit: data.receptorCuit,
       receptorName: data.receptorName,
       pdfUrl: null,

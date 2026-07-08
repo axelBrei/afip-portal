@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { invoices } from '@/lib/db/schema'
+import { getInvoicesTable } from '@/lib/db/invoices-table'
 import { getPresignedUrl, uploadPdf } from '@/lib/r2/client'
 import { InvoicePdfGenerator } from '@arcasdk/pdf'
 import { eq } from 'drizzle-orm'
@@ -14,14 +14,16 @@ export async function POST(
   const arcaCuit = process.env.ARCA_CUIT
   if (!arcaCuit) return NextResponse.json({ error: 'ARCA_CUIT not configured' }, { status: 503 })
 
+  const invoices = getInvoicesTable()
   const rows = await db.select().from(invoices).where(eq(invoices.id, params.id)).limit(1)
   const invoice = rows[0]
   if (!invoice) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (invoice.pdfUrl) return NextResponse.json({ error: 'PDF already exists' }, { status: 409 })
 
   const raw = invoice.rawRequest as Record<string, any>
-  const docTipo: number = raw.DocTipo ?? 99
-  const docNro: number = raw.DocNro ?? 0
+  // Fall back to receptorCuit from DB when rawRequest lacks DocTipo (e.g. synced invoices)
+  const docTipo: number = raw.DocTipo ?? (invoice.receptorCuit ? 80 : 99)
+  const docNro: number = raw.DocNro ?? (invoice.receptorCuit ? parseInt(invoice.receptorCuit, 10) : 0)
   const storedItems: { description: string; quantity: number; unitPrice: number; ivaRate: number }[] =
     raw._items ?? [{ description: 'Honorarios', quantity: 1, unitPrice: Number(invoice.amountTotal), ivaRate: 0 }]
 
@@ -83,6 +85,7 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const invoices = getInvoicesTable()
   try {
     const rows = await db
       .select({ pdfUrl: invoices.pdfUrl })

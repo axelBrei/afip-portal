@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { invoices } from '@/lib/db/schema'
 import { arcaService } from '@/lib/arca/service'
-import { and, eq } from 'drizzle-orm'
+import { getInvoicesTable } from '@/lib/db/invoices-table'
+import { eq } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 
 export const dynamic = 'force-dynamic'
@@ -35,12 +35,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ lastNro: 0, missing: 0, synced: 0 })
   }
 
-  const activeEnv = arcaService.getActiveEnv()
+  const invoices = getInvoicesTable()
 
   const existing = await db
     .select({ nroCbte: invoices.nroCbte })
     .from(invoices)
-    .where(and(eq(invoices.tipoCbte, tipoCbte), eq(invoices.puntoVenta, puntoVenta), eq(invoices.cuit, arcaCuit), eq(invoices.arcaEnv, activeEnv)))
+    .where(eq(invoices.tipoCbte, tipoCbte))
 
   const existingSet = new Set(existing.map((r) => r.nroCbte))
 
@@ -64,7 +64,6 @@ export async function POST(request: NextRequest) {
       await db.insert(invoices).values({
         id: randomUUID(),
         cuit: arcaCuit,
-        arcaEnv: activeEnv,
         tipoCbte,
         puntoVenta,
         nroCbte: nro,
