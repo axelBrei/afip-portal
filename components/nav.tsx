@@ -51,6 +51,7 @@ export function Nav() {
       })
       await queryClient.invalidateQueries({ queryKey: ['settings'] })
       await queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      await queryClient.invalidateQueries({ queryKey: ['stats'] })
     } finally {
       setSwitching(false)
     }
