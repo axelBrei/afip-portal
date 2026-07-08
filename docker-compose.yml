@@ -13,6 +13,24 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+  drizzle-studio:
+    container_name: afip-drizzle-studio
+    build: .
+    command: ./node_modules/.bin/drizzle-kit studio --host 0.0.0.0
+    restart: unless-stopped
+    ports:
+      - "4983:4983"
+    networks:
+      - coolify
+      - internal-net
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgres://${PG_USER}:${PG_PASSWORD}@${PG_HOST}:${PG_PORT}/${PG_DB}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   afip-portal:
     container_name: afip-portal
     build: .
