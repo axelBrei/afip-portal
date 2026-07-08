@@ -7,7 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Input } from '@/components/ui/input'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { FileText, Search, Settings, LogOut, Users, Menu, X } from 'lucide-react'
+import { FileText, Search, Settings, LogOut, Users, Menu, X, LayoutDashboard } from 'lucide-react'
 
 type Settings = { activeEnv: string }
 
@@ -105,6 +105,10 @@ export function Nav() {
 
         {/* Desktop nav */}
         <nav className="hidden sm:flex items-center gap-1 flex-1">
+          <Link href="/dashboard" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}>
+            <LayoutDashboard className="h-4 w-4 mr-1" />
+            Dashboard
+          </Link>
           <Link href="/invoices" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}>
             <FileText className="h-4 w-4 mr-1" />
             Facturas
@@ -195,6 +199,14 @@ export function Nav() {
           </form>
 
           <nav className="flex flex-col gap-1">
+            <Link
+              href="/dashboard"
+              onClick={() => setMobileOpen(false)}
+              className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'justify-start')}
+            >
+              <LayoutDashboard className="h-4 w-4 mr-2" />
+              Dashboard
+            </Link>
             <Link
               href="/invoices"
               onClick={() => setMobileOpen(false)}
