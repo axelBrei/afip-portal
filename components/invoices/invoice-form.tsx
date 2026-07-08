@@ -232,8 +232,8 @@ export function InvoiceForm() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-w-2xl">
 
-      {/* Comprobante + Receptor */}
-      <Card className="border-border">
+      {/* overflow-visible + z-10: receptor picker dropdown escapes card and paints above sibling cards */}
+      <Card className="border-border overflow-visible z-10">
         <CardContent className="px-6 pt-6 pb-6 space-y-5">
           <SectionLabel>Comprobante</SectionLabel>
           <div className="grid grid-cols-2 gap-4">
