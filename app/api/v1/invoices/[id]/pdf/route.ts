@@ -32,7 +32,14 @@ export async function POST(
   const cbteFecha = invoice.createdAt.toISOString().slice(0, 10).replace(/-/g, '')
 
   try {
+    const pdfStart = Date.now()
+    console.log(`[POST /api/v1/invoices/${invoice.id}/pdf] PDF start`)
+
+    const t0 = Date.now()
     const emisor = await getEmisor()
+    console.log(`[POST /api/v1/invoices/${invoice.id}/pdf] getEmisor ${Date.now() - t0}ms`)
+
+    const t1 = Date.now()
     const pdfGen = new InvoicePdfGenerator({ includeQr: true })
     const pdfBuffer = await pdfGen.generate({
       emisor,
@@ -63,12 +70,16 @@ export async function POST(
       cae: invoice.cae,
       caeFechaVencimiento: invoice.caeFchVto,
     })
+    console.log(`[POST /api/v1/invoices/${invoice.id}/pdf] pdfGen.generate ${Date.now() - t1}ms size=${pdfBuffer.length}b`)
 
     const year = invoice.createdAt.getFullYear()
     const pdfKey = `invoices/${arcaCuit}/${year}/${invoice.id}.pdf`
+    const t2 = Date.now()
     await uploadPdf(pdfKey, pdfBuffer)
+    console.log(`[POST /api/v1/invoices/${invoice.id}/pdf] uploadPdf ${Date.now() - t2}ms`)
+
     await db.update(invoices).set({ pdfUrl: pdfKey }).where(eq(invoices.id, invoice.id))
-    console.log(`[POST /api/v1/invoices/${invoice.id}/pdf] Generated and saved ${pdfKey}`)
+    console.log(`[POST /api/v1/invoices/${invoice.id}/pdf] done total=${Date.now() - pdfStart}ms key=${pdfKey}`)
     return NextResponse.json({ ok: true, pdfUrl: pdfKey })
   } catch (err) {
     console.error(`[POST /api/v1/invoices/${invoice.id}/pdf] Error:`, err)

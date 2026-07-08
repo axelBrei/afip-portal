@@ -19,9 +19,12 @@ export async function getEmisor(): Promise<EmisorData> {
   if (!arcaCuit) throw new Error('ARCA_CUIT not configured')
 
   const arca = arcaService.getClient()
+  console.log(`[getEmisor] fetching from ws_sr_constancia_inscripcion cuit=${arcaCuit}`)
+  const t0 = Date.now()
   const taxpayer = await arca.registerInscriptionProofService.getTaxpayerDetails(
     parseInt(arcaCuit, 10)
   )
+  console.log(`[getEmisor] ws_sr_constancia_inscripcion ${Date.now() - t0}ms`)
 
   if (!taxpayer) throw new Error(`Emisor CUIT ${arcaCuit} not found in ARCA registry`)
 

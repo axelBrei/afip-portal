@@ -137,7 +137,14 @@ export async function POST(
 
   let pdfKey: string | null = null
   try {
+    const pdfStart = Date.now()
+    console.log(`[POST credit-note] PDF start id=${id}`)
+
+    const t0 = Date.now()
     const emisor = await getEmisor()
+    console.log(`[POST credit-note] getEmisor ${Date.now() - t0}ms`)
+
+    const t1 = Date.now()
     const pdfGen = new InvoicePdfGenerator({ includeQr: true })
     const pdfBuffer = await pdfGen.generate({
       emisor,
@@ -168,10 +175,16 @@ export async function POST(
       cae,
       caeFechaVencimiento: caeFchVto,
     })
+    console.log(`[POST credit-note] pdfGen.generate ${Date.now() - t1}ms size=${pdfBuffer.length}b`)
+
     const year = new Date().getFullYear()
     pdfKey = `invoices/${arcaCuit}/${year}/${id}.pdf`
+    const t2 = Date.now()
     await uploadPdf(pdfKey, pdfBuffer)
+    console.log(`[POST credit-note] uploadPdf ${Date.now() - t2}ms`)
+
     await db.update(invoices).set({ pdfUrl: pdfKey }).where(eq(invoices.id, id))
+    console.log(`[POST credit-note] PDF done total=${Date.now() - pdfStart}ms key=${pdfKey}`)
   } catch (err) {
     console.error('[POST credit-note] PDF error (NC already saved):', err)
   }

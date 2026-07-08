@@ -175,7 +175,14 @@ export async function POST(request: NextRequest) {
   const cbteLetra = data.tipoCbte <= 3 ? 'A' : data.tipoCbte <= 8 ? 'B' : 'C'
   let pdfKey: string | null = null
   try {
+    console.log(`[POST /api/v1/invoices] PDF start id=${id}`)
+    const pdfStart = Date.now()
+
+    const t0 = Date.now()
     const emisor = await getEmisor()
+    console.log(`[POST /api/v1/invoices] getEmisor ${Date.now() - t0}ms`)
+
+    const t1 = Date.now()
     const pdfGen = new InvoicePdfGenerator({ includeQr: true })
     const pdfBuffer = await pdfGen.generate({
       emisor,
@@ -206,11 +213,16 @@ export async function POST(request: NextRequest) {
       cae,
       caeFechaVencimiento: caeFchVto,
     })
+    console.log(`[POST /api/v1/invoices] pdfGen.generate ${Date.now() - t1}ms size=${pdfBuffer.length}b`)
+
     const year = new Date().getFullYear()
     pdfKey = `invoices/${arcaCuit}/${year}/${id}.pdf`
+    const t2 = Date.now()
     await uploadPdf(pdfKey, pdfBuffer)
-    console.log(`[POST /api/v1/invoices] PDF uploaded to ${pdfKey}`)
+    console.log(`[POST /api/v1/invoices] uploadPdf ${Date.now() - t2}ms`)
+
     await db.update(invoices).set({ pdfUrl: pdfKey }).where(eq(invoices.id, id))
+    console.log(`[POST /api/v1/invoices] PDF done total=${Date.now() - pdfStart}ms key=${pdfKey}`)
   } catch (err) {
     console.error('[POST /api/v1/invoices] PDF generation/upload error (invoice already saved):', err)
   }
