@@ -6,16 +6,12 @@ const PUBLIC_PATHS = ['/login', '/api/v1/auth/login', '/api/v1/auth/logout', '/a
 
 async function getSession(request: NextRequest): Promise<SessionData | null> {
   const cookie = request.cookies.get('afip-session')?.value
-  console.log(`[middleware:getSession] cookie present=${!!cookie} SESSION_SECRET=${process.env.SESSION_SECRET ? 'SET' : 'UNSET'} raw-cookie-header="${request.headers.get('cookie')?.slice(0, 200) ?? 'none'}"`)
   if (!cookie) return null
   try {
-    const data = await unsealData<SessionData>(cookie, {
+    return await unsealData<SessionData>(cookie, {
       password: process.env.SESSION_SECRET!,
     })
-    console.log(`[middleware:getSession] unseal ok user=${JSON.stringify(data?.user)}`)
-    return data
-  } catch (err) {
-    console.error(`[middleware:getSession] unseal failed:`, err)
+  } catch {
     return null
   }
 }
