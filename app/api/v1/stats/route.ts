@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { arcaService } from '@/lib/arca/service'
+import { padronCache, monotributoCategories } from '@/lib/db/schema'
+import { eq, and } from 'drizzle-orm'
 import { sql } from 'drizzle-orm'
 
 export const dynamic = 'force-dynamic'
@@ -53,6 +55,44 @@ export async function GET(req: NextRequest) {
     }
   })
 
+  // Resolve user's monotributo category from padron cache
+  const arcaCuit = process.env.ARCA_CUIT ?? ''
+  let myCategory: string | null = null
+  let categoryLimit: { ingresosBrutos: number; cuotaMensual: number } | null = null
+
+  if (arcaCuit) {
+    const padronRow = await db
+      .select({ data: padronCache.data })
+      .from(padronCache)
+      .where(and(eq(padronCache.cuit, arcaCuit), eq(padronCache.env, env)))
+      .limit(1)
+
+    const pd = padronRow[0]?.data as Record<string, unknown> | undefined
+    const descripcion = (
+      (pd?.datosMonotributo as Record<string, unknown>)
+        ?.categoriaMonotributo as Record<string, unknown>
+    )?.descripcionCategoria as string | undefined
+
+    if (descripcion) {
+      myCategory = descripcion.trim().split(/\s+/)[0] ?? null
+    }
+
+    if (myCategory) {
+      const catRow = await db
+        .select()
+        .from(monotributoCategories)
+        .where(eq(monotributoCategories.categ, myCategory))
+        .limit(1)
+
+      if (catRow[0]) {
+        categoryLimit = {
+          ingresosBrutos: parseFloat(catRow[0].ingresosBrutos),
+          cuotaMensual: parseFloat(catRow[0].cuotaMensual),
+        }
+      }
+    }
+  }
+
   return NextResponse.json({
     year,
     monthly,
@@ -60,5 +100,7 @@ export async function GET(req: NextRequest) {
       netRevenue: parseFloat(totalsRow?.net_revenue ?? '0'),
       invoiceCount: parseInt(totalsRow?.invoice_count ?? '0', 10),
     },
+    myCategory,
+    categoryLimit,
   })
 }

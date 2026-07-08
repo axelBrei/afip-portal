@@ -13,6 +13,8 @@ type StatsData = {
   year: number
   monthly: { month: number; netRevenue: number; invoiceCount: number }[]
   totals: { netRevenue: number; invoiceCount: number }
+  myCategory: string | null
+  categoryLimit: { ingresosBrutos: number; cuotaMensual: number } | null
 }
 
 async function fetchStats(year: number): Promise<StatsData> {
@@ -45,6 +47,80 @@ function StatCard({ label, value, dim }: { label: string; value: string; dim?: b
       <p className={`mt-2 text-[1.75rem] font-semibold tracking-tight leading-none ${dim ? 'text-muted-foreground' : 'text-foreground'}`}>
         {value}
       </p>
+    </div>
+  )
+}
+
+function MonotributoLimitCard({
+  category,
+  limit,
+  netRevenue,
+}: {
+  category: string | null
+  limit: { ingresosBrutos: number; cuotaMensual: number } | null
+  netRevenue: number
+}) {
+  if (!category || !limit) {
+    return (
+      <div className="rounded-lg border border-border bg-card p-6">
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+          Límite Monotributo
+        </p>
+        <p className="mt-3 text-sm text-muted-foreground">
+          {!category
+            ? 'No se encontró categoría en el padrón. Consultá el padrón con tu CUIT para obtener los datos.'
+            : 'Actualizá los límites desde Configuración para ver el progreso.'}
+        </p>
+      </div>
+    )
+  }
+
+  const pct = Math.min((netRevenue / limit.ingresosBrutos) * 100, 100)
+  const remaining = Math.max(limit.ingresosBrutos - netRevenue, 0)
+
+  const barColor =
+    pct >= 95 ? '#ef4444' :
+    pct >= 80 ? '#f59e0b' :
+    '#5e6ad2'
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+          Límite Monotributo
+        </p>
+        <span className="text-xs font-semibold px-2 py-0.5 rounded border border-border text-foreground">
+          Cat. {category}
+        </span>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-end justify-between">
+          <div>
+            <p className="text-[1.75rem] font-semibold tracking-tight leading-none text-foreground">
+              {fmtARS(netRevenue)}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              de {fmtARS(limit.ingresosBrutos)} anuales
+            </p>
+          </div>
+          <p className="text-2xl font-semibold tabular-nums" style={{ color: barColor }}>
+            {pct.toFixed(1)}%
+          </p>
+        </div>
+
+        {/* Progress bar */}
+        <div className="h-2 w-full rounded-full bg-border overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${pct}%`, backgroundColor: barColor }}
+          />
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          Restante: {fmtARS(remaining)}
+        </p>
+      </div>
     </div>
   )
 }
@@ -120,6 +196,13 @@ export function StatsView() {
           dim={totals.invoiceCount === 0}
         />
       </div>
+
+      {/* Monotributo limit */}
+      <MonotributoLimitCard
+        category={data?.myCategory ?? null}
+        limit={data?.categoryLimit ?? null}
+        netRevenue={totals.netRevenue}
+      />
 
       {/* Monthly revenue chart */}
       <div className="rounded-lg border border-border bg-card p-6">
