@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useForm, useFieldArray } from 'react-hook-form'
+import { useForm, useFieldArray, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import Link from 'next/link'
@@ -14,6 +14,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import { DatePicker } from '@/components/ui/date-picker'
 import { Trash2, Plus, Download, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ReceptorPicker } from './receptor-picker'
@@ -369,17 +370,35 @@ export function InvoiceForm() {
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <Label className="text-sm text-muted-foreground">Desde</Label>
-              <Input type="date" {...register('fchServDesde')} />
+              <Controller
+                control={control}
+                name="fchServDesde"
+                render={({ field }) => (
+                  <DatePicker value={field.value} onChange={field.onChange} />
+                )}
+              />
               {errors.fchServDesde && <p className="text-xs text-destructive">{errors.fchServDesde.message}</p>}
             </div>
             <div className="space-y-1.5">
               <Label className="text-sm text-muted-foreground">Hasta</Label>
-              <Input type="date" {...register('fchServHasta')} />
+              <Controller
+                control={control}
+                name="fchServHasta"
+                render={({ field }) => (
+                  <DatePicker value={field.value} onChange={field.onChange} />
+                )}
+              />
               {errors.fchServHasta && <p className="text-xs text-destructive">{errors.fchServHasta.message}</p>}
             </div>
             <div className="space-y-1.5">
               <Label className="text-sm text-muted-foreground">Vto. pago</Label>
-              <Input type="date" {...register('fchVtoPago')} />
+              <Controller
+                control={control}
+                name="fchVtoPago"
+                render={({ field }) => (
+                  <DatePicker value={field.value} onChange={field.onChange} />
+                )}
+              />
               {errors.fchVtoPago && <p className="text-xs text-destructive">{errors.fchVtoPago.message}</p>}
             </div>
           </div>

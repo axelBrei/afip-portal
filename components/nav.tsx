@@ -98,7 +98,7 @@ export function Nav() {
     <header className="border-b border-border bg-background">
       {/* Main bar */}
       <div className="container mx-auto flex h-14 items-center gap-3 px-4">
-        <Link href="/invoices" className="font-semibold text-sm tracking-tight text-foreground shrink-0">
+        <Link href="/dashboard" className="font-semibold text-sm tracking-tight text-foreground shrink-0">
           AFIP Portal
         </Link>
 

@@ -8,12 +8,35 @@ import { Badge } from '@/components/ui/badge'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, SlidersHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Invoice } from '@/lib/db/schema'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
+import { DatePicker } from '@/components/ui/date-picker'
 
-async function fetchInvoices(page: number): Promise<{ data: Invoice[]; page: number; limit: number }> {
-  const res = await fetch(`/api/v1/invoices?page=${page}`)
+type Filters = {
+  dateFrom:   string
+  dateTo:     string
+  puntoVenta: string
+  nroCbte:    string
+  receptor:   string
+  tipoCbte:   string
+}
+
+const EMPTY_FILTERS: Filters = { dateFrom: '', dateTo: '', puntoVenta: '', nroCbte: '', receptor: '', tipoCbte: '' }
+
+async function fetchInvoices(page: number, filters: Filters): Promise<{ data: Invoice[]; page: number; limit: number }> {
+  const params = new URLSearchParams({ page: String(page) })
+  if (filters.dateFrom)   params.set('dateFrom', filters.dateFrom)
+  if (filters.dateTo)     params.set('dateTo', filters.dateTo)
+  if (filters.puntoVenta) params.set('puntoVenta', filters.puntoVenta)
+  if (filters.nroCbte)    params.set('nroCbte', filters.nroCbte)
+  if (filters.receptor)   params.set('receptor', filters.receptor)
+  if (filters.tipoCbte)   params.set('tipoCbte', filters.tipoCbte)
+  const base = typeof window !== 'undefined' ? '' : 'http://localhost:3000'
+  const res = await fetch(`${base}/api/v1/invoices?${params}`)
   if (!res.ok) throw new Error('Failed to fetch invoices')
   return res.json()
 }
@@ -33,11 +56,17 @@ export function InvoiceList({ page = 1 }: { page?: number }) {
   const queryClient = useQueryClient()
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<string | null>(null)
+  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
 
   const { data } = useSuspenseQuery({
-    queryKey: ['invoices', page],
-    queryFn: () => fetchInvoices(page),
+    queryKey: ['invoices', page, filters],
+    queryFn: () => fetchInvoices(page, filters),
   })
+
+  function setFilter(key: keyof Filters, value: string) {
+    setFilters(prev => ({ ...prev, [key]: value }))
+  }
+
 
   async function handleSync() {
     setSyncing(true)
@@ -67,6 +96,8 @@ export function InvoiceList({ page = 1 }: { page?: number }) {
     }
   }
 
+  const activeCount = Object.values(filters).filter(Boolean).length
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3">
@@ -74,6 +105,103 @@ export function InvoiceList({ page = 1 }: { page?: number }) {
           <RefreshCw className={cn('h-4 w-4 mr-1.5', syncing && 'animate-spin')} />
           {syncing ? 'Sincronizando...' : 'Sincronizar con AFIP'}
         </Button>
+        <Popover>
+          <PopoverTrigger className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
+            <SlidersHorizontal className="h-4 w-4 mr-1.5" />
+            Filtrar
+            {activeCount > 0 && (
+              <span className="ml-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+                {activeCount}
+              </span>
+            )}
+          </PopoverTrigger>
+          <PopoverContent className="w-80">
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Fecha desde</Label>
+                  <DatePicker
+                    value={filters.dateFrom}
+                    onChange={v => setFilter('dateFrom', v)}
+                    placeholder="Desde"
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Fecha hasta</Label>
+                  <DatePicker
+                    value={filters.dateTo}
+                    onChange={v => setFilter('dateTo', v)}
+                    placeholder="Hasta"
+                    className="h-8 text-xs"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="filter-pto-venta">Pto. de Venta</Label>
+                  <Input
+                    id="filter-pto-venta"
+                    type="number"
+                    min={1}
+                    value={filters.puntoVenta}
+                    onChange={e => setFilter('puntoVenta', e.target.value)}
+                    placeholder="Ej: 1"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="filter-nro">Número</Label>
+                  <Input
+                    id="filter-nro"
+                    type="number"
+                    min={1}
+                    value={filters.nroCbte}
+                    onChange={e => setFilter('nroCbte', e.target.value)}
+                    placeholder="Ej: 42"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="filter-receptor">Receptor</Label>
+                <Input
+                  id="filter-receptor"
+                  type="text"
+                  value={filters.receptor}
+                  onChange={e => setFilter('receptor', e.target.value)}
+                  placeholder="Nombre o CUIT"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="filter-tipo">Tipo</Label>
+                <select
+                  id="filter-tipo"
+                  value={filters.tipoCbte}
+                  onChange={e => setFilter('tipoCbte', e.target.value)}
+                  className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 cursor-pointer"
+                >
+                  <option value="">Todos los tipos</option>
+                  <option value="1">Factura A</option>
+                  <option value="6">Factura B</option>
+                  <option value="11">Factura C</option>
+                  <option value="2">Nota Débito A</option>
+                  <option value="7">Nota Débito B</option>
+                  <option value="12">Nota Débito C</option>
+                  <option value="3">Nota Crédito A</option>
+                  <option value="8">Nota Crédito B</option>
+                  <option value="13">Nota Crédito C</option>
+                </select>
+              </div>
+              {activeCount > 0 && (
+                <button
+                  onClick={() => setFilters(EMPTY_FILTERS)}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Limpiar filtros
+                </button>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
         {syncResult && <span className="text-sm text-muted-foreground">{syncResult}</span>}
       </div>
 
@@ -91,7 +219,6 @@ export function InvoiceList({ page = 1 }: { page?: number }) {
               <TableHead>Nro.</TableHead>
               <TableHead>Receptor</TableHead>
               <TableHead className="text-right">Total</TableHead>
-              <TableHead>CAE vence</TableHead>
               <TableHead>Fecha</TableHead>
               <TableHead className="hidden sm:table-cell"></TableHead>
             </TableRow>
@@ -128,7 +255,6 @@ export function InvoiceList({ page = 1 }: { page?: number }) {
                   ${Number(invoice.amountTotal).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                 </TableCell>
                 <TableCell>{invoice.caeFchVto}</TableCell>
-                <TableCell>{new Date(invoice.createdAt).toLocaleDateString('es-AR')}</TableCell>
                 <TableCell className="hidden sm:table-cell">
                   <Link
                     href={`/invoices/${invoice.id}`}

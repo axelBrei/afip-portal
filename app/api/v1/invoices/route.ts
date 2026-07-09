@@ -7,7 +7,7 @@ import { padronCache } from '@/lib/db/schema'
 import { uploadPdf } from '@/lib/r2/client'
 import { InvoicePdfGenerator } from '@arcasdk/pdf'
 import { z } from 'zod'
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, gte, ilike, lte, or, SQL } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 
 const CONDICION_IVA_MAP: Record<number, string> = {
@@ -182,11 +182,34 @@ export async function GET(request: NextRequest) {
   const invoices = getInvoicesTable()
   const activeEnv = arcaService.getActiveEnv()
 
+  const conditions: SQL[] = []
+
+  const dateFrom  = searchParams.get('dateFrom')
+  const dateTo    = searchParams.get('dateTo')
+  const puntoVenta = searchParams.get('puntoVenta')
+  const nroCbte   = searchParams.get('nroCbte')
+  const receptor  = searchParams.get('receptor')
+  const tipoCbte  = searchParams.get('tipoCbte')
+
+  if (dateFrom) conditions.push(gte(invoices.caeFchVto, dateFrom))
+  if (dateTo)   conditions.push(lte(invoices.caeFchVto, dateTo))
+  if (puntoVenta) conditions.push(eq(invoices.puntoVenta, parseInt(puntoVenta, 10)))
+  if (nroCbte)    conditions.push(eq(invoices.nroCbte, parseInt(nroCbte, 10)))
+  if (tipoCbte)   conditions.push(eq(invoices.tipoCbte, parseInt(tipoCbte, 10)))
+  if (receptor) {
+    const pattern = `%${receptor}%`
+    conditions.push(or(
+      ilike(invoices.receptorName, pattern),
+      ilike(invoices.receptorCuit, pattern),
+    )!)
+  }
+
   try {
     const rows = await db
       .select()
       .from(invoices)
-      .orderBy(desc(invoices.createdAt))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(invoices.caeFchVto))
       .limit(limit)
       .offset(offset)
 

@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
   const monthlyRows = await db.execute(sql`
     SELECT
-      EXTRACT(MONTH FROM created_at AT TIME ZONE 'America/Argentina/Buenos_Aires')::int AS month,
+      EXTRACT(MONTH FROM cae_fch_vto)::int AS month,
       SUM(
         CASE WHEN tipo_cbte = ANY(ARRAY[3, 8, 13])
           THEN -amount_total::numeric
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
       ) AS net_revenue,
       COUNT(*) FILTER (WHERE tipo_cbte != ALL(ARRAY[3, 8, 13]))::int AS invoice_count
     FROM ${sql.identifier(tableName)}
-    WHERE EXTRACT(YEAR FROM created_at AT TIME ZONE 'America/Argentina/Buenos_Aires') = ${year}
+    WHERE EXTRACT(YEAR FROM cae_fch_vto) = ${year}
     GROUP BY month
     ORDER BY month
   `) as unknown as Array<{ month: number; net_revenue: string; invoice_count: string }>
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
       ) AS net_revenue,
       COUNT(*) FILTER (WHERE tipo_cbte != ALL(ARRAY[3, 8, 13]))::int AS invoice_count
     FROM ${sql.identifier(tableName)}
-    WHERE EXTRACT(YEAR FROM created_at AT TIME ZONE 'America/Argentina/Buenos_Aires') = ${year}
+    WHERE EXTRACT(YEAR FROM cae_fch_vto) = ${year}
   `) as unknown as Array<{ net_revenue: string | null; invoice_count: string }>)[0]
 
   const monthly = Array.from({ length: 12 }, (_, i) => {

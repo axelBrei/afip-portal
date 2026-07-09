@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { InvoiceList } from '@/components/invoices/invoice-list'
+import { CsvImportButton } from '@/components/invoices/csv-import-button'
 
 function InvoiceListSkeleton() {
   return (
@@ -21,9 +22,12 @@ export default function InvoicesPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Facturas</h1>
-        <Link href="/invoices/new" className={buttonVariants()}>
-          Nueva factura
-        </Link>
+        <div className="flex items-center gap-2">
+          <CsvImportButton />
+          <Link href="/invoices/new" className={buttonVariants()}>
+            Nueva factura
+          </Link>
+        </div>
       </div>
       <Suspense fallback={<InvoiceListSkeleton />}>
         <InvoiceList />
