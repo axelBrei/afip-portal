@@ -7,7 +7,7 @@ import { padronCache } from '@/lib/db/schema'
 import { uploadPdf } from '@/lib/r2/client'
 import { InvoicePdfGenerator } from '@arcasdk/pdf'
 import { z } from 'zod'
-import { and, desc, eq, gte, ilike, lte, or, SQL } from 'drizzle-orm'
+import { and, count, desc, eq, gte, ilike, lte, or, SQL } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 
 const CONDICION_IVA_MAP: Record<number, string> = {
@@ -204,17 +204,22 @@ export async function GET(request: NextRequest) {
     )!)
   }
 
-  try {
-    const rows = await db
-      .select()
-      .from(invoices)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(invoices.caeFchVto))
-      .limit(limit)
-      .offset(offset)
+  const where = conditions.length > 0 ? and(...conditions) : undefined
 
-    console.log(`[GET /api/v1/invoices] env=${activeEnv} page=${page} limit=${limit} returned=${rows.length}`)
-    return NextResponse.json({ data: rows, page, limit })
+  try {
+    const [rows, [{ total }]] = await Promise.all([
+      db
+        .select()
+        .from(invoices)
+        .where(where)
+        .orderBy(desc(invoices.caeFchVto))
+        .limit(limit)
+        .offset(offset),
+      db.select({ total: count() }).from(invoices).where(where),
+    ])
+
+    console.log(`[GET /api/v1/invoices] env=${activeEnv} page=${page} limit=${limit} returned=${rows.length} total=${total}`)
+    return NextResponse.json({ data: rows, page, limit, total })
   } catch (err) {
     console.error('[GET /api/v1/invoices] DB error:', err)
     return NextResponse.json({ error: 'Failed to fetch invoices' }, { status: 500 })

@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
-import { RefreshCw, SlidersHorizontal } from 'lucide-react'
+import { ChevronLeft, ChevronRight, RefreshCw, SlidersHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Invoice } from '@/lib/db/schema'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -27,7 +27,7 @@ type Filters = {
 
 const EMPTY_FILTERS: Filters = { dateFrom: '', dateTo: '', puntoVenta: '', nroCbte: '', receptor: '', tipoCbte: '' }
 
-async function fetchInvoices(page: number, filters: Filters): Promise<{ data: Invoice[]; page: number; limit: number }> {
+async function fetchInvoices(page: number, filters: Filters): Promise<{ data: Invoice[]; page: number; limit: number; total: number }> {
   const params = new URLSearchParams({ page: String(page) })
   if (filters.dateFrom)   params.set('dateFrom', filters.dateFrom)
   if (filters.dateTo)     params.set('dateTo', filters.dateTo)
@@ -52,11 +52,12 @@ const SYNC_TYPES = [1, 2, 3, 6, 7, 8, 11, 12, 13].flatMap((tipoCbte) => [
   { tipoCbte, puntoVenta: 2 },
 ])
 
-export function InvoiceList({ page = 1 }: { page?: number }) {
+export function InvoiceList() {
   const queryClient = useQueryClient()
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<string | null>(null)
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
+  const [page, setPage] = useState(1)
 
   const { data } = useSuspenseQuery({
     queryKey: ['invoices', page, filters],
@@ -64,6 +65,7 @@ export function InvoiceList({ page = 1 }: { page?: number }) {
   })
 
   function setFilter(key: keyof Filters, value: string) {
+    setPage(1)
     setFilters(prev => ({ ...prev, [key]: value }))
   }
 
@@ -193,7 +195,7 @@ export function InvoiceList({ page = 1 }: { page?: number }) {
               </div>
               {activeCount > 0 && (
                 <button
-                  onClick={() => setFilters(EMPTY_FILTERS)}
+                  onClick={() => { setFilters(EMPTY_FILTERS); setPage(1) }}
                   className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Limpiar filtros
@@ -267,6 +269,35 @@ export function InvoiceList({ page = 1 }: { page?: number }) {
             ))}
           </TableBody>
         </Table>
+      )}
+
+      {data.total > data.limit && (
+        <div className="flex items-center justify-between pt-2">
+          <p className="text-xs text-muted-foreground">
+            {(page - 1) * data.limit + 1}–{Math.min(page * data.limit, data.total)} de {data.total}
+          </p>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(p => p - 1)}
+              disabled={page === 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="px-2 text-sm tabular-nums">
+              {page} / {Math.ceil(data.total / data.limit)}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(p => p + 1)}
+              disabled={page * data.limit >= data.total}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   )
