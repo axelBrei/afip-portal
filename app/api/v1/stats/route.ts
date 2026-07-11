@@ -40,10 +40,19 @@ export async function GET(req: NextRequest) {
           ELSE amount_total::numeric
         END
       ) AS net_revenue,
-      COUNT(*) FILTER (WHERE tipo_cbte != ALL(ARRAY[3, 8, 13]))::int AS invoice_count
+      COUNT(*) FILTER (WHERE tipo_cbte != ALL(ARRAY[3, 8, 13]))::int AS invoice_count,
+      SUM(amount_total::numeric) FILTER (WHERE tipo_cbte != ALL(ARRAY[3, 8, 13])) AS gross_revenue,
+      COUNT(*) FILTER (WHERE tipo_cbte = ANY(ARRAY[3, 8, 13]))::int AS credit_note_count,
+      SUM(amount_total::numeric) FILTER (WHERE tipo_cbte = ANY(ARRAY[3, 8, 13])) AS credit_note_total
     FROM ${sql.identifier(tableName)}
     WHERE EXTRACT(YEAR FROM cae_fch_vto) = ${year}
-  `) as unknown as Array<{ net_revenue: string | null; invoice_count: string }>)[0]
+  `) as unknown as Array<{
+    net_revenue: string | null
+    invoice_count: string
+    gross_revenue: string | null
+    credit_note_count: string
+    credit_note_total: string | null
+  }>)[0]
 
   const monthly = Array.from({ length: 12 }, (_, i) => {
     const monthNum = i + 1
@@ -99,6 +108,9 @@ export async function GET(req: NextRequest) {
     totals: {
       netRevenue: parseFloat(totalsRow?.net_revenue ?? '0'),
       invoiceCount: parseInt(totalsRow?.invoice_count ?? '0', 10),
+      grossRevenue: parseFloat(totalsRow?.gross_revenue ?? '0'),
+      creditNoteCount: parseInt(totalsRow?.credit_note_count ?? '0', 10),
+      creditNoteTotal: parseFloat(totalsRow?.credit_note_total ?? '0'),
     },
     myCategory,
     categoryLimit,

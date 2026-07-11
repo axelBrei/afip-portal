@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
+import { Info } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
@@ -12,7 +13,13 @@ const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov
 type StatsData = {
   year: number
   monthly: { month: number; netRevenue: number; invoiceCount: number }[]
-  totals: { netRevenue: number; invoiceCount: number }
+  totals: {
+    netRevenue: number
+    invoiceCount: number
+    grossRevenue: number
+    creditNoteCount: number
+    creditNoteTotal: number
+  }
   myCategory: string | null
   categoryLimit: { ingresosBrutos: number; cuotaMensual: number } | null
 }
@@ -38,12 +45,22 @@ function fmtCompact(n: number) {
   return `$${n.toFixed(0)}`
 }
 
-function StatCard({ label, value, dim }: { label: string; value: string; dim?: boolean }) {
+function StatCard({ label, value, dim, tooltip }: { label: string; value: string; dim?: boolean; tooltip?: React.ReactNode }) {
   return (
     <div className="rounded-lg border border-border bg-card p-6">
-      <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-        {label}
-      </p>
+      <div className="flex items-center gap-1.5">
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+          {label}
+        </p>
+        {tooltip && (
+          <div className="relative group/tip">
+            <Info className="h-3 w-3 text-muted-foreground/60 cursor-help" />
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 rounded-lg border border-border bg-card p-2.5 text-xs text-muted-foreground opacity-0 group-hover/tip:opacity-100 pointer-events-none transition-opacity z-50 shadow-md">
+              {tooltip}
+            </div>
+          </div>
+        )}
+      </div>
       <p className={`mt-2 text-[1.75rem] font-semibold tracking-tight leading-none ${dim ? 'text-muted-foreground' : 'text-foreground'}`}>
         {value}
       </p>
@@ -161,7 +178,7 @@ export function StatsView() {
     count: m.invoiceCount,
   }))
 
-  const totals = data?.totals ?? { netRevenue: 0, invoiceCount: 0 }
+  const totals = data?.totals ?? { netRevenue: 0, invoiceCount: 0, grossRevenue: 0, creditNoteCount: 0, creditNoteTotal: 0 }
   const avg = totals.invoiceCount > 0 ? totals.netRevenue / totals.invoiceCount : 0
 
   return (
@@ -185,15 +202,37 @@ export function StatsView() {
         <StatCard
           label="Ingresos netos"
           value={isLoading ? '—' : fmtARS(totals.netRevenue)}
+          tooltip={
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span>Facturas / NdD</span>
+                <span className="font-mono text-foreground">{fmtARS(totals.grossRevenue)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Notas de crédito ({totals.creditNoteCount})</span>
+                <span className="font-mono text-destructive">−{fmtARS(totals.creditNoteTotal)}</span>
+              </div>
+              <div className="border-t border-border pt-1 flex justify-between font-medium text-foreground">
+                <span>Total</span>
+                <span className="font-mono">{fmtARS(totals.netRevenue)}</span>
+              </div>
+            </div>
+          }
         />
         <StatCard
           label="Comprobantes emitidos"
           value={isLoading ? '—' : String(totals.invoiceCount)}
+          tooltip={
+            <span>Facturas y notas de débito. Las notas de crédito ({totals.creditNoteCount}) no se cuentan.</span>
+          }
         />
         <StatCard
           label="Promedio por factura"
           value={isLoading ? '—' : fmtARS(avg)}
           dim={totals.invoiceCount === 0}
+          tooltip={
+            <span>Ingresos netos ÷ comprobantes emitidos</span>
+          }
         />
       </div>
 
