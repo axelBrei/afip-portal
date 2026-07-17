@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { api } from '@/lib/api-path'
 
 const schema = z.object({
   username: z.string().min(1, 'Requerido'),
@@ -29,7 +30,7 @@ export function LoginForm() {
     setError(null)
     console.log('[login] submitting', { username: data.username, url: '/api/v1/auth/login' })
     try {
-      const res = await fetch('/api/v1/auth/login', {
+      const res = await fetch(api('/api/v1/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),

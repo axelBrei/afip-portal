@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { PersonaServiceA5PortTypes } from '@arcasdk/core/lib/application/dto/register/persona-service-inscription-proof.types'
+import { api } from '@/lib/api-path'
 
 // SOAP responses come back with PascalCase keys; normalize to camelCase so we
 // can use the SDK's TypeScript interfaces for field access.
@@ -79,7 +80,7 @@ function StatusBadge({ estado }: { estado?: string }) {
 }
 
 async function fetchPadron(cuit: string) {
-  const res = await fetch(`/api/v1/padron/${cuit}`)
+  const res = await fetch(api(`/api/v1/padron/${cuit}`))
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     const error = new Error(err.error ?? 'Error al consultar el padrón') as Error & { status: number }

@@ -18,6 +18,7 @@ import { DatePicker } from '@/components/ui/date-picker'
 import { Trash2, Plus, Download, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ReceptorPicker } from './receptor-picker'
+import { api } from '@/lib/api-path'
 
 const IVA_RATES = [
   { id: 3, label: '0%', rate: 0 },
@@ -135,7 +136,7 @@ export function InvoiceForm() {
 
   const { data: docTypesData } = useQuery<{ data: DocumentType[] }>({
     queryKey: ['document-types'],
-    queryFn: () => fetch('/api/v1/invoices/document-types').then((r) => r.json()),
+    queryFn: () => fetch(api('/api/v1/invoices/document-types')).then((r) => r.json()),
     staleTime: Infinity,
   })
   const docTypes = docTypesData?.data ?? []
@@ -169,7 +170,7 @@ export function InvoiceForm() {
 
   const createInvoice = useMutation({
     mutationFn: async (payload: InvoicePayload) => {
-      const res = await fetch('/api/v1/invoices', {
+      const res = await fetch(api('/api/v1/invoices'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { CheckCircle, XCircle, AlertTriangle, Upload, RefreshCw } from 'lucide-react'
+import { api } from '@/lib/api-path'
 import type { MonotributoCategory } from '@/lib/db/schema'
 
 type ArcaEnv = 'production' | 'sandbox'
@@ -26,7 +27,7 @@ interface SettingsData {
 }
 
 async function fetchSettings(): Promise<SettingsData> {
-  const res = await fetch('/api/v1/settings')
+  const res = await fetch(api('/api/v1/settings'))
   if (!res.ok) throw new Error(`Failed to fetch settings: ${res.status} ${res.statusText}`)
   return res.json()
 }
@@ -65,7 +66,7 @@ function UploadSection({ env, onSuccess }: UploadSectionProps) {
       const fd = new FormData()
       fd.append('cert', cert)
       fd.append('key', key)
-      const res = await fetch(`/api/v1/settings/certificates?env=${env}`, { method: 'PUT', body: fd })
+      const res = await fetch(api(`/api/v1/settings/certificates?env=${env}`), { method: 'PUT', body: fd })
       if (res.ok) {
         setResult({ ok: true, message: 'Certificados actualizados correctamente' })
         if (certRef.current) certRef.current.value = ''
@@ -124,7 +125,7 @@ function MonotributoCard() {
 
   const { data } = useQuery<{ categories: MonotributoCategory[] }>({
     queryKey: ['monotributo-categories'],
-    queryFn: () => fetch('/api/v1/settings/scrape-monotributo').then((r) => r.json()),
+    queryFn: () => fetch(api('/api/v1/settings/scrape-monotributo')).then((r) => r.json()),
     staleTime: 60_000,
   })
 
@@ -132,7 +133,7 @@ function MonotributoCard() {
     setScraping(true)
     setError(null)
     try {
-      const res = await fetch('/api/v1/settings/scrape-monotributo', {
+      const res = await fetch(api('/api/v1/settings/scrape-monotributo'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: scrapeUrl }),
@@ -237,7 +238,7 @@ export function SettingsForm() {
     if (env === data.activeEnv || switching) return
     setSwitching(true)
     try {
-      await fetch('/api/v1/settings', {
+      await fetch(api('/api/v1/settings'), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ env }),

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { FileText, Search, Settings, LogOut, Users, Menu, X, LayoutDashboard } from 'lucide-react'
+import { api } from '@/lib/api-path'
 
 type Settings = { activeEnv: string }
 
@@ -20,12 +21,12 @@ export function Nav() {
 
   const { data: settings } = useQuery<Settings>({
     queryKey: ['settings'],
-    queryFn: () => fetch('/api/v1/settings').then((r) => r.json()),
+    queryFn: () => fetch(api('/api/v1/settings')).then((r) => r.json()),
     staleTime: 30_000,
   })
 
   async function handleLogout() {
-    await fetch('/api/v1/auth/logout', { method: 'POST' })
+    await fetch(api('/api/v1/auth/logout'), { method: 'POST' })
     router.push('/login')
     router.refresh()
   }
@@ -44,7 +45,7 @@ export function Nav() {
     const env = e.target.value
     setSwitching(true)
     try {
-      await fetch('/api/v1/settings', {
+      await fetch(api('/api/v1/settings'), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ env }),

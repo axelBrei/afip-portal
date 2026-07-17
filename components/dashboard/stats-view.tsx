@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Info } from 'lucide-react'
+import { api } from '@/lib/api-path'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
@@ -25,7 +26,7 @@ type StatsData = {
 }
 
 async function fetchStats(year: number): Promise<StatsData> {
-  const res = await fetch(`/api/v1/stats?year=${year}`)
+  const res = await fetch(api(`/api/v1/stats?year=${year}`))
   if (!res.ok) throw new Error('Failed to fetch stats')
   return res.json()
 }

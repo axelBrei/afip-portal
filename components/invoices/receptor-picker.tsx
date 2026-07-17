@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Input } from '@/components/ui/input'
 import { X, Loader2 } from 'lucide-react'
+import { api } from '@/lib/api-path'
 
 type Entry = { cuit: string; name: string; tipoPersona?: string | null; tipoClave?: string | null }
 
@@ -48,7 +49,7 @@ export function ReceptorPicker({ onSelect, onClear }: Props) {
 
   const { data } = useQuery<{ data: Entry[] }>({
     queryKey: ['padron-list'],
-    queryFn: () => fetch('/api/v1/padron').then((r) => r.json()),
+    queryFn: () => fetch(api('/api/v1/padron')).then((r) => r.json()),
     staleTime: 60_000,
   })
   const entries = data?.data ?? []
@@ -76,7 +77,7 @@ export function ReceptorPicker({ onSelect, onClear }: Props) {
     }
     attempted.current.add(digits)
     setFetching(true)
-    fetch(`/api/v1/padron/${digits}`)
+    fetch(api(`/api/v1/padron/${digits}`))
       .then((r) => (r.ok ? r.json() : null))
       .then((body) => {
         if (!body) return

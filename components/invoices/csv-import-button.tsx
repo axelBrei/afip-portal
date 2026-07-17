@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Upload } from 'lucide-react'
+import { api } from '@/lib/api-path'
 
 export function CsvImportButton() {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -17,7 +18,7 @@ export function CsvImportButton() {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      const res = await fetch('/api/v1/invoices/import-csv', { method: 'POST', body: formData })
+      const res = await fetch(api('/api/v1/invoices/import-csv'), { method: 'POST', body: formData })
       const body = await res.json()
       if (!res.ok) {
         setResult(body.error ?? 'Error al importar')

@@ -7,6 +7,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Download, FileText, RotateCcw, CheckCircle2, ArrowLeft, ArrowRight, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Invoice } from '@/lib/db/schema'
+import { api } from '@/lib/api-path'
 
 const TIPO_LABEL: Record<number, string> = {
   1: 'Factura A', 2: 'Nota de Débito A', 3: 'Nota de Crédito A',
@@ -15,8 +16,7 @@ const TIPO_LABEL: Record<number, string> = {
 }
 
 async function fetchInvoice(id: string): Promise<Invoice> {
-  const base = typeof window !== 'undefined' ? '' : 'http://localhost:3000'
-  const res = await fetch(`${base}/api/v1/invoices/${id}`)
+  const res = await fetch(api(`/api/v1/invoices/${id}`))
   if (!res.ok) throw new Error('Invoice not found')
   return res.json()
 }
@@ -119,7 +119,7 @@ export function InvoiceDetail({ id }: { id: string }) {
     setGenerating(true)
     setGenError(null)
     try {
-      const res = await fetch(`/api/v1/invoices/${id}/pdf`, { method: 'POST' })
+      const res = await fetch(api(`/api/v1/invoices/${id}/pdf`), { method: 'POST' })
       if (res.ok) {
         await queryClient.invalidateQueries({ queryKey: ['invoice', id] })
       } else {
@@ -137,7 +137,7 @@ export function InvoiceDetail({ id }: { id: string }) {
     setCrediting(true)
     setCreditError(null)
     try {
-      const res = await fetch(`/api/v1/invoices/${id}/credit-note`, { method: 'POST' })
+      const res = await fetch(api(`/api/v1/invoices/${id}/credit-note`), { method: 'POST' })
       const body = await res.json().catch(() => ({}))
       if (res.ok) {
         setFreshCreditNote(body)

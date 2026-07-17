@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { DatePicker } from '@/components/ui/date-picker'
+import { api } from '@/lib/api-path'
 
 type Filters = {
   dateFrom:   string
@@ -35,8 +36,7 @@ async function fetchInvoices(page: number, filters: Filters): Promise<{ data: In
   if (filters.nroCbte)    params.set('nroCbte', filters.nroCbte)
   if (filters.receptor)   params.set('receptor', filters.receptor)
   if (filters.tipoCbte)   params.set('tipoCbte', filters.tipoCbte)
-  const base = typeof window !== 'undefined' ? '' : 'http://localhost:3000'
-  const res = await fetch(`${base}/api/v1/invoices?${params}`)
+  const res = await fetch(api(`/api/v1/invoices?${params}`))
   if (!res.ok) throw new Error('Failed to fetch invoices')
   return res.json()
 }
@@ -77,7 +77,7 @@ export function InvoiceList() {
     try {
       for (const { tipoCbte, puntoVenta } of SYNC_TYPES) {
         const res = await fetch(
-          `/api/v1/invoices/sync?tipoCbte=${tipoCbte}&puntoVenta=${puntoVenta}`,
+          api(`/api/v1/invoices/sync?tipoCbte=${tipoCbte}&puntoVenta=${puntoVenta}`),
           { method: 'POST' }
         )
         if (res.ok) {

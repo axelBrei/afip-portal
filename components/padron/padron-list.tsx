@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Search, Users } from 'lucide-react'
+import { api } from '@/lib/api-path'
 
 type PadronEntry = {
   cuit: string
@@ -19,7 +20,7 @@ export function PadronList() {
 
   const { data, isLoading } = useQuery<{ data: PadronEntry[] }>({
     queryKey: ['padron-list'],
-    queryFn: () => fetch('/api/v1/padron').then((r) => r.json()),
+    queryFn: () => fetch(api('/api/v1/padron')).then((r) => r.json()),
   })
 
   const entries = data?.data ?? []
