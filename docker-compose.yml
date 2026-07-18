@@ -52,6 +52,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    labels:
+      - traefik.docker.network=coolify
     healthcheck:
       test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:3000'+(process.env.NEXT_PUBLIC_BASE_PATH||'')+'/api/v1/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
       interval: 10s
