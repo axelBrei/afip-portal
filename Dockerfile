@@ -17,7 +17,7 @@ RUN npm run build
 
 FROM base AS dev
 RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont
-RUN printf '#!/bin/sh\nexec /usr/bin/chromium-browser --no-sandbox --disable-dev-shm-usage "$@"\n' \
+RUN printf '#!/bin/sh\nexec /usr/bin/chromium-browser --no-sandbox --disable-dev-shm-usage --disable-gpu --no-first-run --disable-extensions "$@"\n' \
     > /usr/local/bin/chromium-docker \
     && chmod +x /usr/local/bin/chromium-docker
 COPY --from=deps /app/node_modules ./node_modules
@@ -35,10 +35,13 @@ ENV PUPPETEER_SKIP_DOWNLOAD=true
 
 RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont
 
-# Wrapper script: adds flags required to run Chromium headlessly inside Docker
-# --no-sandbox: required when running as non-root
+# Wrapper script: flags required for headless Chromium in Docker
+# --no-sandbox:             required when running as non-root
 # --disable-dev-shm-usage: avoids crashes from Docker's limited /dev/shm (default 64 MB)
-RUN printf '#!/bin/sh\nexec /usr/bin/chromium-browser --no-sandbox --disable-dev-shm-usage "$@"\n' \
+# --disable-gpu:            prevents GPU init hang on repeated launches in headless Docker
+# --no-first-run:           skips first-run setup that can leave behind lock files
+# --disable-extensions:     reduces startup overhead and resource usage
+RUN printf '#!/bin/sh\nexec /usr/bin/chromium-browser --no-sandbox --disable-dev-shm-usage --disable-gpu --no-first-run --disable-extensions "$@"\n' \
     > /usr/local/bin/chromium-docker \
     && chmod +x /usr/local/bin/chromium-docker
 

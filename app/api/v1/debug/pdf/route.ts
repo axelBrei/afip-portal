@@ -50,6 +50,22 @@ export async function GET() {
     info.chromiumVersion = 'no accessible binary found'
   }
 
+  // Show running Chromium processes — leftover zombies cause second-launch hangs
+  try {
+    const { stdout } = await execFileAsync('sh', ['-c', 'ps aux | grep -i chrom | grep -v grep || true'], { timeout: 3000 })
+    info.chromiumProcesses = stdout.trim() || '(none)'
+  } catch (e) {
+    info.chromiumProcesses = `ps failed: ${String(e)}`
+  }
+
+  // Disk space in /tmp — Chrome writes large temp files per launch
+  try {
+    const { stdout } = await execFileAsync('df', ['-h', '/tmp'], { timeout: 3000 })
+    info.tmpDiskUsage = stdout.trim()
+  } catch {
+    // ignore
+  }
+
   const t = Date.now()
   try {
     const gen = new InvoicePdfGenerator({ includeQr: false })
