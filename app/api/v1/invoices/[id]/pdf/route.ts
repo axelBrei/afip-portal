@@ -5,6 +5,7 @@ import { padronCache } from '@/lib/db/schema'
 import { getPresignedUrl, uploadPdf } from '@/lib/r2/client'
 import { getEmisor } from '@/lib/arca/emisor'
 import { InvoicePdfGenerator } from '@arcasdk/pdf'
+import { acquirePdfLock } from '@/lib/pdf-lock'
 import { and, eq } from 'drizzle-orm'
 import { arcaService } from '@/lib/arca/service'
 
@@ -87,36 +88,42 @@ export async function POST(
 
     const t1 = Date.now()
     const pdfGen = new InvoicePdfGenerator({ includeQr: true })
-    const pdfBuffer = await pdfGen.generate({
-      emisor,
-      receptor: {
-        razonSocial: invoice.receptorName ?? 'Consumidor Final',
-        domicilio: receptorDomicilio,
-        condicionIva: receptorCondicionIva,
-        documentoTipo: docTipo === 80 ? 'CUIT' : docTipo === 86 ? 'CUIL' : 'DNI',
-        documentoNro: String(docNro),
-      },
-      cbteTipo: invoice.tipoCbte,
-      cbteLetra,
-      puntoVenta: invoice.puntoVenta,
-      cbteDesde: invoice.nroCbte,
-      cbteHasta: invoice.nroCbte,
-      cbteFecha,
-      concepto: raw.Concepto ?? 2,
-      items: storedItems.map((item) => ({
-        descripcion: item.description,
-        cantidad: item.quantity,
-        precioUnitario: item.unitPrice,
-        unidadMedida: 'u',
-        subtotal: item.quantity * item.unitPrice,
-        alicuotaIva: item.ivaRate,
-      })),
-      importeNetoGravado: Number(invoice.amountNet),
-      importeIva: Number(invoice.amountIva),
-      importeTotal: Number(invoice.amountTotal),
-      cae: invoice.cae,
-      caeFechaVencimiento: invoice.caeFchVto,
-    })
+    const releasePdfLock = await acquirePdfLock()
+    let pdfBuffer: Buffer
+    try {
+      pdfBuffer = await pdfGen.generate({
+        emisor,
+        receptor: {
+          razonSocial: invoice.receptorName ?? 'Consumidor Final',
+          domicilio: receptorDomicilio,
+          condicionIva: receptorCondicionIva,
+          documentoTipo: docTipo === 80 ? 'CUIT' : docTipo === 86 ? 'CUIL' : 'DNI',
+          documentoNro: String(docNro),
+        },
+        cbteTipo: invoice.tipoCbte,
+        cbteLetra,
+        puntoVenta: invoice.puntoVenta,
+        cbteDesde: invoice.nroCbte,
+        cbteHasta: invoice.nroCbte,
+        cbteFecha,
+        concepto: raw.Concepto ?? 2,
+        items: storedItems.map((item) => ({
+          descripcion: item.description,
+          cantidad: item.quantity,
+          precioUnitario: item.unitPrice,
+          unidadMedida: 'u',
+          subtotal: item.quantity * item.unitPrice,
+          alicuotaIva: item.ivaRate,
+        })),
+        importeNetoGravado: Number(invoice.amountNet),
+        importeIva: Number(invoice.amountIva),
+        importeTotal: Number(invoice.amountTotal),
+        cae: invoice.cae,
+        caeFechaVencimiento: invoice.caeFchVto,
+      })
+    } finally {
+      releasePdfLock()
+    }
     console.log(`[POST /api/v1/invoices/${invoice.id}/pdf] pdfGen.generate ${Date.now() - t1}ms size=${pdfBuffer.length}b`)
 
     const year = invoice.createdAt.getFullYear()

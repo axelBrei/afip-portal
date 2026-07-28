@@ -6,6 +6,7 @@ import { getInvoicesTable } from '@/lib/db/invoices-table'
 import { padronCache } from '@/lib/db/schema'
 import { uploadPdf } from '@/lib/r2/client'
 import { InvoicePdfGenerator } from '@arcasdk/pdf'
+import { acquirePdfLock } from '@/lib/pdf-lock'
 import { z } from 'zod'
 import { and, count, desc, eq, gte, ilike, lte, or, SQL } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
@@ -128,36 +129,42 @@ async function generateAndUploadPdf(opts: {
 
     const t1 = Date.now()
     const pdfGen = new InvoicePdfGenerator({ includeQr: true })
-    const pdfBuffer = await pdfGen.generate({
-      emisor,
-      receptor: {
-        razonSocial: data.receptorName ?? 'Consumidor Final',
-        domicilio: receptorDomicilio,
-        condicionIva: receptorCondicionIva,
-        documentoTipo: data.docTipo === 80 ? 'CUIT' : data.docTipo === 86 ? 'CUIL' : 'DNI',
-        documentoNro: String(data.docNro),
-      },
-      cbteTipo: data.tipoCbte,
-      cbteLetra,
-      puntoVenta: data.puntoVenta,
-      cbteDesde: nroCbte,
-      cbteHasta: nroCbte,
-      cbteFecha: today,
-      concepto: data.concepto,
-      items: data.items.map((item) => ({
-        descripcion: item.description,
-        cantidad: item.quantity,
-        precioUnitario: item.unitPrice,
-        unidadMedida: 'u',
-        subtotal: item.quantity * item.unitPrice,
-        alicuotaIva: item.ivaRate,
-      })),
-      importeNetoGravado: data.impNeto,
-      importeIva: data.impIva,
-      importeTotal: data.impTotal,
-      cae,
-      caeFechaVencimiento: caeFchVto,
-    })
+    const releasePdfLock = await acquirePdfLock()
+    let pdfBuffer: Buffer
+    try {
+      pdfBuffer = await pdfGen.generate({
+        emisor,
+        receptor: {
+          razonSocial: data.receptorName ?? 'Consumidor Final',
+          domicilio: receptorDomicilio,
+          condicionIva: receptorCondicionIva,
+          documentoTipo: data.docTipo === 80 ? 'CUIT' : data.docTipo === 86 ? 'CUIL' : 'DNI',
+          documentoNro: String(data.docNro),
+        },
+        cbteTipo: data.tipoCbte,
+        cbteLetra,
+        puntoVenta: data.puntoVenta,
+        cbteDesde: nroCbte,
+        cbteHasta: nroCbte,
+        cbteFecha: today,
+        concepto: data.concepto,
+        items: data.items.map((item) => ({
+          descripcion: item.description,
+          cantidad: item.quantity,
+          precioUnitario: item.unitPrice,
+          unidadMedida: 'u',
+          subtotal: item.quantity * item.unitPrice,
+          alicuotaIva: item.ivaRate,
+        })),
+        importeNetoGravado: data.impNeto,
+        importeIva: data.impIva,
+        importeTotal: data.impTotal,
+        cae,
+        caeFechaVencimiento: caeFchVto,
+      })
+    } finally {
+      releasePdfLock()
+    }
     console.log(`[PDF bg] pdfGen.generate ${Date.now() - t1}ms size=${pdfBuffer.length}b`)
 
     const year = new Date().getFullYear()
