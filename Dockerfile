@@ -24,6 +24,7 @@ COPY --from=deps /app/node_modules ./node_modules
 ENV NODE_ENV=development
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PUPPETEER_SKIP_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/local/bin/chromium-docker
 EXPOSE 3000
 CMD ["npm", "run", "dev"]
 

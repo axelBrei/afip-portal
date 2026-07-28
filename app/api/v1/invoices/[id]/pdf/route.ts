@@ -87,8 +87,11 @@ export async function POST(
       : (docTipo === 80 ? 'Responsable Inscripto' : 'Consumidor Final')
 
     const t1 = Date.now()
+    console.log(`[POST /api/v1/invoices/${invoice.id}/pdf] PUPPETEER_EXECUTABLE_PATH=${process.env.PUPPETEER_EXECUTABLE_PATH ?? '(not set)'}`)
     const pdfGen = new InvoicePdfGenerator({ includeQr: true })
+    const lockWait = Date.now()
     const releasePdfLock = await acquirePdfLock()
+    console.log(`[POST /api/v1/invoices/${invoice.id}/pdf] lock acquired after ${Date.now() - lockWait}ms`)
     let pdfBuffer: Buffer
     try {
       pdfBuffer = await pdfGen.generate({
