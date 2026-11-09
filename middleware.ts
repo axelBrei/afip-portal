@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { unsealData } from 'iron-session'
 import type { SessionData } from '@/lib/session'
+import { isAuthDisabled } from '@/lib/auth-config'
 
 const PUBLIC_PATHS = ['/login', '/api/v1/auth/login', '/api/v1/auth/logout', '/api/v1/health']
 
@@ -45,8 +46,8 @@ export async function middleware(request: NextRequest) {
     return res
   }
 
-  const session = await getSession(request)
-  if (!session?.user) {
+  const session = isAuthDisabled() ? null : await getSession(request)
+  if (!isAuthDisabled() && !session?.user) {
     if (pathname.startsWith('/api/')) {
       return new NextResponse('Unauthorized', {
         status: 401,

@@ -12,7 +12,7 @@ import { api } from '@/lib/api-path'
 
 type Settings = { activeEnv: string }
 
-export function Nav() {
+export function Nav({ showLogout = true }: { showLogout?: boolean }) {
   const router = useRouter()
   const queryClient = useQueryClient()
   const [cuit, setCuit] = useState('')
@@ -137,9 +137,11 @@ export function Nav() {
             <Search className="h-4 w-4" />
           </Button>
         </form>
-        <Button variant="ghost" size="sm" onClick={handleLogout} className="hidden sm:flex">
-          <LogOut className="h-4 w-4" />
-        </Button>
+        {showLogout && (
+          <Button variant="ghost" size="sm" onClick={handleLogout} className="hidden sm:flex">
+            <LogOut className="h-4 w-4" />
+          </Button>
+        )}
 
         {/* Mobile hamburger */}
         <div className="flex-1 sm:hidden" />
@@ -237,12 +239,14 @@ export function Nav() {
         </div>
 
         {/* Drawer footer */}
-        <div className="px-3 py-4 border-t border-border shrink-0">
-          <Button variant="ghost" size="sm" onClick={handleLogout} className="w-full justify-start">
-            <LogOut className="h-4 w-4 mr-2" />
-            Cerrar sesión
-          </Button>
-        </div>
+        {showLogout && (
+          <div className="px-3 py-4 border-t border-border shrink-0">
+            <Button variant="ghost" size="sm" onClick={handleLogout} className="w-full justify-start">
+              <LogOut className="h-4 w-4 mr-2" />
+              Cerrar sesión
+            </Button>
+          </div>
+        )}
       </div>
     </header>
   )
