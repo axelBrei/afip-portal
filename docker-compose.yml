@@ -8,6 +8,9 @@ services:
       POSTGRES_DB: ${PG_DB}
       POSTGRES_USER: ${PG_USER}
       POSTGRES_PASSWORD: ${PG_PASSWORD}
+    volumes:
+      # postgres 18+ keeps data in /var/lib/postgresql/<major>/docker, so mount the parent dir
+      - ${PGDATA_PATH:-pgdata}:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${PG_USER} -d ${PG_DB}"]
       interval: 5s
@@ -39,7 +42,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - certs:/data/certs
+      - ${CERTS_PATH:-certs}:/data/certs
     networks:
       - coolify
       - internal-net
@@ -55,7 +58,11 @@ services:
     labels:
       - traefik.docker.network=coolify
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:3000'+(process.env.NEXT_PUBLIC_BASE_PATH||'')+'/api/v1/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "require(''http'').get(''http://127.0.0.1:3000''+(process.env.NEXT_PUBLIC_BASE_PATH||'''')+''/api/v1/health'',r=>process.exit(r.statusCode===200?0:1)).on(''error'',()=>process.exit(1))"',
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -63,6 +70,7 @@ services:
 
 volumes:
   certs:
+  pgdata:
 
 networks:
   internal-net:
