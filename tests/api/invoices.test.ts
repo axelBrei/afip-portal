@@ -1,14 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-const { mockSelect, mockInsert, mockCreateNextVoucher, mockUploadPdf, mockGetPresignedUrl } =
+const { mockSelect, mockInsert, mockCreateNextVoucher, mockUploadPdf, mockGetPresignedUrl, mockGetPdfObject } =
   vi.hoisted(() => {
     const mockSelect = vi.fn()
     const mockInsert = vi.fn()
     const mockCreateNextVoucher = vi.fn()
     const mockUploadPdf = vi.fn().mockResolvedValue(undefined)
     const mockGetPresignedUrl = vi.fn().mockResolvedValue('https://r2.example.com/test.pdf')
-    return { mockSelect, mockInsert, mockCreateNextVoucher, mockUploadPdf, mockGetPresignedUrl }
+    const mockGetPdfObject = vi.fn().mockResolvedValue(Buffer.from('%PDF-1.4 test'))
+    return { mockSelect, mockInsert, mockCreateNextVoucher, mockUploadPdf, mockGetPresignedUrl, mockGetPdfObject }
   })
 
 vi.mock('@/lib/db', () => ({
@@ -20,6 +21,7 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/arca/service', () => ({
   arcaService: {
+    getActiveEnv: vi.fn(() => 'sandbox'),
     getClient: vi.fn(() => ({
       electronicBillingService: { createNextVoucher: mockCreateNextVoucher },
     })),
@@ -29,6 +31,7 @@ vi.mock('@/lib/arca/service', () => ({
 vi.mock('@/lib/r2/client', () => ({
   uploadPdf: mockUploadPdf,
   getPresignedUrl: mockGetPresignedUrl,
+  getPdfObject: mockGetPdfObject,
 }))
 
 vi.mock('@arcasdk/pdf', () => ({
@@ -195,7 +198,7 @@ describe('GET /api/v1/invoices/:id/pdf', () => {
     vi.clearAllMocks()
   })
 
-  it('redirects to presigned URL', async () => {
+  const pdfRow = () =>
     mockSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
@@ -203,11 +206,33 @@ describe('GET /api/v1/invoices/:id/pdf', () => {
         }),
       }),
     })
+
+  it('streams the PDF through the portal by default', async () => {
+    pdfRow()
+    mockGetPdfObject.mockResolvedValue(Buffer.from('%PDF-1.4 test'))
     const req = new NextRequest('http://localhost/api/v1/invoices/uuid-1/pdf')
+    const res = await getPdf(req, { params: { id: 'uuid-1' } })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('Content-Type')).toBe('application/pdf')
+    expect(mockGetPdfObject).toHaveBeenCalledWith('invoices/20111111112/2026/uuid-1.pdf')
+    expect(Buffer.from(await res.arrayBuffer()).toString()).toBe('%PDF-1.4 test')
+  })
+
+  it('redirects to a presigned URL with ?redirect=1', async () => {
+    pdfRow()
+    const req = new NextRequest('http://localhost/api/v1/invoices/uuid-1/pdf?redirect=1')
     const res = await getPdf(req, { params: { id: 'uuid-1' } })
     expect(res.status).toBe(302)
     expect(mockGetPresignedUrl).toHaveBeenCalledWith('invoices/20111111112/2026/uuid-1.pdf', 900)
     expect(res.headers.get('Location')).toBe('https://r2.example.com/test.pdf')
+  })
+
+  it('returns 502 when R2 fetch fails', async () => {
+    pdfRow()
+    mockGetPdfObject.mockRejectedValueOnce(new Error('boom'))
+    const req = new NextRequest('http://localhost/api/v1/invoices/uuid-1/pdf')
+    const res = await getPdf(req, { params: { id: 'uuid-1' } })
+    expect(res.status).toBe(502)
   })
 
   it('returns 404 when pdf not found', async () => {

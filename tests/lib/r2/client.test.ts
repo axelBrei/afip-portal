@@ -16,7 +16,7 @@ vi.mock('@aws-sdk/client-s3', () => {
     S3Client: vi.fn(() => ({
       send: vi.fn(async () => {
         mockSendCalls.push({ timestamp: Date.now() })
-        return {}
+        return { Body: { transformToByteArray: async () => new Uint8Array([37, 80, 68, 70]) } }
       }),
     })),
     PutObjectCommand: vi.fn((input) => ({ input })),
@@ -30,7 +30,7 @@ vi.mock('@aws-sdk/s3-request-presigner', () => {
   }
 })
 
-import { uploadPdf, getPresignedUrl } from '@/lib/r2/client'
+import { uploadPdf, getPresignedUrl, getPdfObject } from '@/lib/r2/client'
 
 describe('R2 client', () => {
   beforeEach(() => {
@@ -42,6 +42,11 @@ describe('R2 client', () => {
     const buf = Buffer.from('pdf-content')
     await uploadPdf('invoices/20111111112/2026/uuid.pdf', buf)
     expect(mockSendCalls.length).toBe(1)
+  })
+
+  it('getPdfObject returns the object body as a Buffer', async () => {
+    const buf = await getPdfObject('invoices/20111111112/2026/uuid.pdf')
+    expect(buf.toString()).toBe('%PDF')
   })
 
   it('getPresignedUrl returns a signed URL string', async () => {

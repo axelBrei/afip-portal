@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getInvoicesTable } from '@/lib/db/invoices-table'
 import { padronCache } from '@/lib/db/schema'
-import { getPresignedUrl, uploadPdf } from '@/lib/r2/client'
+import { getPdfObject, getPresignedUrl, uploadPdf } from '@/lib/r2/client'
 import { getEmisor } from '@/lib/arca/emisor'
 import { InvoicePdfGenerator } from '@arcasdk/pdf'
 import { acquirePdfLock } from '@/lib/pdf-lock'
@@ -145,10 +145,11 @@ export async function POST(
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const invoices = getInvoicesTable()
+  const wantsRedirect = request.nextUrl.searchParams.get('redirect') === '1'
   try {
     const rows = await db
       .select({ pdfUrl: invoices.pdfUrl })
@@ -161,12 +162,32 @@ export async function GET(
       return NextResponse.json({ error: 'PDF not found' }, { status: 404 })
     }
 
+    // ?redirect=1 keeps the old behaviour (302 to a 15-min presigned R2 URL), e.g. for API clients
+    // that want a link. By default the PDF is streamed through the portal so browsers never
+    // have to reach R2 directly.
+    if (wantsRedirect) {
+      try {
+        const url = await getPresignedUrl(rows[0].pdfUrl, 900)
+        return NextResponse.redirect(url, { status: 302 })
+      } catch (err) {
+        console.error(`[GET /api/v1/invoices/${params.id}/pdf] R2 presign error:`, err)
+        return NextResponse.json({ error: 'Failed to generate PDF URL', details: String(err) }, { status: 500 })
+      }
+    }
+
     try {
-      const url = await getPresignedUrl(rows[0].pdfUrl, 900)
-      return NextResponse.redirect(url, { status: 302 })
+      const pdf = await getPdfObject(rows[0].pdfUrl)
+      return new NextResponse(new Uint8Array(pdf), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `inline; filename="invoice-${params.id}.pdf"`,
+          'Cache-Control': 'private, no-store',
+        },
+      })
     } catch (err) {
-      console.error(`[GET /api/v1/invoices/${params.id}/pdf] R2 presign error:`, err)
-      return NextResponse.json({ error: 'Failed to generate PDF URL', details: String(err) }, { status: 500 })
+      console.error(`[GET /api/v1/invoices/${params.id}/pdf] R2 fetch error:`, err)
+      return NextResponse.json({ error: 'Failed to fetch PDF', details: String(err) }, { status: 502 })
     }
   } catch (err) {
     console.error(`[GET /api/v1/invoices/${params.id}/pdf] DB error:`, err)

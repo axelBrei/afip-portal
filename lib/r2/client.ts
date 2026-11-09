@@ -30,6 +30,14 @@ export async function uploadPdf(key: string, buffer: Buffer): Promise<void> {
   )
 }
 
+export async function getPdfObject(key: string): Promise<Buffer> {
+  const res = await getR2Client().send(
+    new GetObjectCommand({ Bucket: process.env.R2_BUCKET!, Key: key })
+  )
+  if (!res.Body) throw new Error(`Empty R2 object body for key ${key}`)
+  return Buffer.from(await res.Body.transformToByteArray())
+}
+
 export async function getPresignedUrl(key: string, expiresIn = 900): Promise<string> {
   return getSignedUrl(
     getR2Client(),
